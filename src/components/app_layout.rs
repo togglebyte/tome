@@ -4,7 +4,7 @@ use anathema::{
     component::ComponentId,
     prelude::Context,
     runtime::Builder,
-    state::{AnyMap, State, Value},
+    state::{State, Value},
 };
 use serde::{Deserialize, Serialize};
 
@@ -16,6 +16,7 @@ pub enum AppLayoutMessages {
     OpenDashboard,
 }
 
+#[derive(Copy, Clone)]
 enum AppDisplay {
     Dashboard,
     Options,

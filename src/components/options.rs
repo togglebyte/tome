@@ -4,7 +4,7 @@ use crate::{
     theme::{get_app_theme_by_name, AppTheme},
 };
 
-use std::{cell::RefCell, collections::HashMap, process::Child, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use anathema::{
     component::{Component, ComponentId},

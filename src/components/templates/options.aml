@@ -27,13 +27,13 @@ zstack [background: app_theme.background]
             span [foreground: app_theme.border_focused, background: "black"] val
             span [foreground: app_theme.border_focused, background: "reset"] "]"
 
-if options_window == "SyntaxThemeSelector"
+if state.options_window == "SyntaxThemeSelector"
   @syntax_theme_selector (
     syntax_theme_selector__selection -> syntax_theme_selector__selection,
     syntax_theme_selector__cancel -> syntax_theme_selector__cancel
   ) [id: "syntax_theme_selector"]
 
-if options_window == "AppThemeSelector"
+if state.options_window == "AppThemeSelector"
   align [alignment: "center"]
     @app_theme_selector (
       app_theme_selector__selection -> app_theme_selector__selection,

@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, fs::File, rc::Rc};
 
 use anathema::{
     component::ComponentId,
-    prelude::{Document, ToSourceKind, TuiBackend},
+    prelude::{Backend, Document, ToSourceKind, TuiBackend},
     runtime::{Builder, Runtime},
 };
 use log::{info, LevelFilter};
@@ -94,6 +94,7 @@ impl App {
         let tui = TuiBackend::builder()
             .enable_raw_mode()
             .hide_cursor()
+            .enable_alt_screen()
             .finish();
 
         info!("Made tui");
@@ -105,19 +106,19 @@ impl App {
         }
 
         let mut backend = tui.unwrap();
+        backend.finalize();
+
         let mut runtime_builder = Runtime::builder(doc, &backend);
 
         info!("Registering components...");
         self.register_components(&mut runtime_builder)?;
 
+        let _emitter = runtime_builder.emitter();
         info!("Started runtime...");
-        if let Err(error) = runtime_builder.finish(|rt| rt.run(&mut backend)) {
-            eprintln!("{:?}", error);
-        }
+        runtime_builder.finish(|rt| rt.run(&mut backend)).unwrap();
 
         // if let Ok(mut runtime) = runtime {
         //     let _emitter = runtime.emitter();
-
         //     info!("Running runtime...");
         //     runtime.run();
         // } else if let Err(error) = runtime {

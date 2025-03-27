@@ -1,5 +1,5 @@
-if display == "Dashboard"
-  @dashboard [id: "app"]
+if state.display == "Dashboard"
+    @dashboard [id: "app"]
 
-if display == "Options"
-  @options [id: "options"]
+if state.display == "Options"
+    @options [id: "options"]
