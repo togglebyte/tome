@@ -234,7 +234,7 @@ impl SyntaxThemeSelector {
 
         self.update_code_sample(context, &theme_name);
 
-        state.window_list = new_list_state.into();
+        state.window_list = new_list_state;
     }
 
     fn update_code_sample(
@@ -378,9 +378,7 @@ impl Component for SyntaxThemeSelector {
                         //     &state.selected_item
                         // });
                     }
-                    None => {
-                        context.publish("syntax_theme_selector__cancel")
-                    }
+                    None => context.publish("syntax_theme_selector__cancel"),
                 }
             }
 

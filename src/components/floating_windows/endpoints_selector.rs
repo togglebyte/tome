@@ -221,7 +221,7 @@ impl EndpointsSelector {
                 new_list_state.push(endpoint);
             });
 
-        state.window_list = new_list_state.into();
+        state.window_list = new_list_state;
     }
 
     fn delete_endpoint(
@@ -238,13 +238,9 @@ impl EndpointsSelector {
                     state.selected_item.set(project_json);
                     context.publish("endpoints_selector__delete")
                 }
-                Err(_) => {
-                    context.publish("endpoints_selector__cancel")
-                }
+                Err(_) => context.publish("endpoints_selector__cancel"),
             },
-            None => {
-                context.publish("endpoints_selector__cancel")
-            }
+            None => context.publish("endpoints_selector__cancel"),
         }
     }
 
@@ -262,13 +258,9 @@ impl EndpointsSelector {
                     state.selected_item.set(project_json);
                     context.publish("rename_endpoint")
                 }
-                Err(_) => {
-                    context.publish("endpoints_selector__cancel")
-                }
+                Err(_) => context.publish("endpoints_selector__cancel"),
             },
-            None => {
-                context.publish("endpoints_selector__cancel")
-            }
+            None => context.publish("endpoints_selector__cancel"),
         }
     }
 }
@@ -395,13 +387,9 @@ impl Component for EndpointsSelector {
                             //     &state.selected_item
                             // });
                         }
-                        Err(_) => {
-                            context.publish("endpoints_selector__cancel")
-                        }
+                        Err(_) => context.publish("endpoints_selector__cancel"),
                     },
-                    None => {
-                        context.publish("endpoints_selector__cancel")
-                    }
+                    None => context.publish("endpoints_selector__cancel"),
                 }
             }
 

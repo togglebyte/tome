@@ -236,7 +236,7 @@ impl Component for OptionsView {
         ident: &str,
         value: &dyn AnyState,
         state: &mut Self::State,
-        children: anathema::component::Children,
+        _: anathema::component::Children,
         mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match ident {
@@ -260,7 +260,6 @@ impl Component for OptionsView {
             }
             "syntax_theme_selector__cancel" => {
                 state.options_window.set(OptionsWindows::None);
-
                 context.components.by_name("options").focus();
             }
 

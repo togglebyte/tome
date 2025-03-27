@@ -314,7 +314,7 @@ impl FileSelector {
                 new_list_state.push(entry);
             });
 
-        state.window_list = new_list_state.into();
+        state.window_list = new_list_state;
     }
 
     fn handle_file(&self, entry: &Entry, context: Context<'_, '_, FileSelectorState>) {

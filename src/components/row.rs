@@ -1,4 +1,4 @@
-use anathema::{component::Component, derive::State};
+use anathema::component::Component;
 
 #[derive(Default)]
 pub struct Row;

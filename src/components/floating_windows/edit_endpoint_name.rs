@@ -55,7 +55,7 @@ impl DashboardMessageHandler for EditEndpointName {
         match event.as_str() {
             "edit_endpoint_name__specific_endpoint_rename" => {
                 let Ok(specific_name_update) =
-                    serde_json::from_str::<SpecificNameUpdate>(&value.as_str().unwrap())
+                    serde_json::from_str::<SpecificNameUpdate>(value.as_str().unwrap())
                 else {
                     let error_message =
                         "There was an error while processing the name update".to_string();
@@ -373,9 +373,7 @@ impl EditEndpointName {
 
         match rename_endpoint(project_name, endpoint, &state.name.to_ref()) {
             Ok(_) => {
-                // context.publish("edit_endpoint_name__specific_endpoint_rename", |state| {
-                //     &state.specific_name_change
-                // });
+                context.publish("edit_endpoint_name__specific_endpoint_rename");
             }
             Err(_) => {
                 let error_message = "There was an error renaming the endpoint".to_string();

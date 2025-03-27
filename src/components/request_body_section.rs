@@ -1,7 +1,4 @@
-use anathema::{
-    component::Component,
-    state::{AnyState, State},
-};
+use anathema::{component::Component, state::AnyState};
 
 #[derive(Default)]
 pub struct RequestBodySection;
@@ -18,10 +15,8 @@ impl anathema::state::State for RequestBodySectionState {
     }
 }
 impl anathema::state::AnyMap for RequestBodySectionState {
-    fn lookup(&self, key: &str) -> Option<anathema::state::PendingValue> {
-        match key {
-            _ => None,
-        }
+    fn lookup(&self, _key: &str) -> Option<anathema::state::PendingValue> {
+        None
     }
 }
 

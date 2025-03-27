@@ -52,7 +52,7 @@ impl DashboardMessageHandler for EditProjectName {
         match event.as_str() {
             "edit_project_name__specific_project_rename" => {
                 let Ok(specific_name_update) =
-                    serde_json::from_str::<SpecificNameUpdate>(&value.as_str().unwrap())
+                    serde_json::from_str::<SpecificNameUpdate>(value.as_str().unwrap())
                 else {
                     let error_message =
                         "There was an error while processing the name update".to_string();
@@ -208,15 +208,11 @@ impl Component for EditProjectName {
                         context.publish("edit_project_name__submit");
                     }
                 },
-                'c' => {
-                    context.publish("edit_project_name__cancel")
-                }
+                'c' => context.publish("edit_project_name__cancel"),
 
                 _ => {}
             },
-            anathema::component::KeyCode::Esc => {
-                context.publish("edit_project_name__cancel")
-            }
+            anathema::component::KeyCode::Esc => context.publish("edit_project_name__cancel"),
 
             _ => {}
         }
@@ -308,9 +304,7 @@ impl EditProjectName {
 
         match rename_project(project, &state.name.to_ref()) {
             Ok(_) => {
-                // context.publish("edit_project_name__specific_project_rename", |state| {
-                //     &state.specific_name_change
-                // });
+                context.publish("edit_project_name__specific_project_rename");
             }
             Err(_) => {
                 let error_message = "There was an error renaming the project".to_string();

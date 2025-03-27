@@ -11,7 +11,7 @@ use anathema::{
     default_widgets::{Overflow, Text},
     geometry::Pos,
     prelude::Context,
-    state::{Number, State, Value},
+    state::{Number, Value},
     widgets::layout::text::{Line, Segment},
 };
 use arboard::Clipboard;

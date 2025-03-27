@@ -332,8 +332,7 @@ fn handle_successful_response(
     state.response_body_window_label.set(window_label);
     state.main_display.set(DashboardDisplay::ResponseBody);
 
-    // MISSING
-    // context.components.by_name("response_renderer").focus(); ;
+    context.components.by_name("response_renderer").focus();
 
     let response_msg = ResponseRendererMessages::ResponseUpdate(ext);
     if let Ok(msg) = serde_json::to_string(&response_msg) {
@@ -365,8 +364,7 @@ fn handle_error_response(
             state.response_body_window_label.set(window_label);
             state.main_display.set(DashboardDisplay::ResponseBody);
 
-            // MISSING
-            // context.components.by_name("response_renderer").focus(); ;
+            context.components.by_name("response_renderer").focus();
 
             // TODO: Once the response headers are being extracted, figure out the correct
             // extension type to use to syntax highlight the response

@@ -1,7 +1,7 @@
 use anathema::{
     component::{Component, KeyCode},
     prelude::Context,
-    state::{AnyState, Value},
+    state::Value,
 };
 
 #[derive(Default)]

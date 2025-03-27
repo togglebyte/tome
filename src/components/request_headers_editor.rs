@@ -1,4 +1,4 @@
-use anathema::{component::Component, state::State};
+use anathema::component::Component;
 
 #[derive(Default)]
 pub struct RequestHeadersEditor;
@@ -15,10 +15,8 @@ impl anathema::state::State for RequestHeadersEditorState {
     }
 }
 impl anathema::state::AnyMap for RequestHeadersEditorState {
-    fn lookup(&self, key: &str) -> Option<anathema::state::PendingValue> {
-        match key {
-            _ => None,
-        }
+    fn lookup(&self, _key: &str) -> Option<anathema::state::PendingValue> {
+        None
     }
 }
 

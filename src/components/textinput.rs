@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use anathema::{
     component::{Component, ComponentId, KeyCode},
     prelude::Context,
-    state::{AnyState, Value},
+    state::Value,
 };
 use serde::{Deserialize, Serialize};
 

@@ -223,7 +223,7 @@ impl EditHeaderSelector {
                 new_list_state.push(header);
             });
 
-        state.window_list = new_list_state.into();
+        state.window_list = new_list_state;
     }
 
     fn delete_header(

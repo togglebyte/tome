@@ -5,7 +5,7 @@ use std::{
 };
 
 use anathema::{
-    component::{self, Component, ComponentId},
+    component::{Component, ComponentId},
     runtime::Builder,
     state::{AnyState, State, Value},
 };
