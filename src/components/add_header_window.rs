@@ -6,10 +6,9 @@ use std::{
 
 use anathema::{
     component::{self, Component, ComponentId, KeyCode},
-    prelude::{Context, TuiBackend},
-    runtime::RuntimeBuilder,
-    state::{CommonVal, State, Value},
-    widgets::Elements,
+    prelude::Context,
+    runtime::Builder,
+    state::{AnyMap, AnyState, State, Value},
 };
 use serde::{Deserialize, Serialize};
 
@@ -30,11 +29,11 @@ pub struct AddHeaderWindow {
 impl AddHeaderWindow {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
     ) -> anyhow::Result<()> {
         let name: String = "add_header_window".to_string();
 
-        let app_id = builder.register_component(
+        let app_id = builder.component(
             name.clone(),
             template("templates/add_header_window"),
             AddHeaderWindow {
@@ -64,7 +63,7 @@ impl AddHeaderWindow {
     pub fn set_values_for_inputs(
         &self,
         state: &AddHeaderWindowState,
-        context: Context<'_, AddHeaderWindowState>,
+        context: Context<'_, '_, AddHeaderWindowState>,
     ) {
         let Ok(ids) = self.component_ids.try_borrow() else {
             return;
@@ -119,24 +118,24 @@ impl AddHeaderWindowState {
 
 impl DashboardMessageHandler for AddHeaderWindow {
     fn handle_message(
-        value: component::CommonVal<'_>,
+        value: &dyn AnyState,
         ident: impl Into<String>,
         state: &mut super::dashboard::DashboardState,
-        mut context: anathema::prelude::Context<'_, super::dashboard::DashboardState>,
-        _: Elements<'_, '_>,
+        mut context: anathema::prelude::Context<'_, '_, super::dashboard::DashboardState>,
+        _: anathema::component::Children,
         _component_ids: Ref<'_, HashMap<String, ComponentId<String>>>,
     ) {
         let event: String = ident.into();
         match event.as_str() {
             "add_header__name_update" => {
-                let Ok(new_header) = serde_json::from_str::<Header>(&value.to_string()) else {
+                let Ok(new_header) = serde_json::from_str::<Header>(value.as_str().unwrap()) else {
                     return;
                 };
 
                 state.new_header_name.set(new_header.name);
             }
             "add_header__value_update" => {
-                let Ok(new_header) = serde_json::from_str::<Header>(&value.to_string()) else {
+                let Ok(new_header) = serde_json::from_str::<Header>(value.as_str().unwrap()) else {
                     return;
                 };
 
@@ -149,7 +148,7 @@ impl DashboardMessageHandler for AddHeaderWindow {
                 let header_value = state.new_header_value.to_ref().to_string();
 
                 state.floating_window.set(FloatingWindow::None);
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
 
                 if header_name.trim().is_empty() || header_value.trim().is_empty() {
                     return;
@@ -167,7 +166,7 @@ impl DashboardMessageHandler for AddHeaderWindow {
                 state.floating_window.set(FloatingWindow::None);
                 state.new_header_name.set("".to_string());
                 state.new_header_value.set("".to_string());
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
             }
 
             _ => {}
@@ -182,8 +181,8 @@ impl Component for AddHeaderWindow {
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         self.update_app_theme(state);
     }
@@ -192,13 +191,13 @@ impl Component for AddHeaderWindow {
         &mut self,
         message: Self::Message,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         #[allow(clippy::single_match)]
         match message.as_str() {
             "open" => {
-                context.set_focus("id", "header_name_input");
+                context.components.by_name("header_name_input").focus();
             }
 
             component_messages => {
@@ -234,28 +233,36 @@ impl Component for AddHeaderWindow {
     fn receive(
         &mut self,
         ident: &str,
-        value: anathema::state::CommonVal<'_>,
+        value: &dyn AnyState,
         state: &mut Self::State,
-        _elements: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        _elements: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match ident {
             "header_name_update" => {
-                state.header.to_mut().name.set(value.to_string());
+                state
+                    .header
+                    .to_mut()
+                    .name
+                    .set(value.as_str().unwrap().to_string());
                 state.header.to_mut().update_common();
 
-                context.publish("add_header__name_update", |state| &state.header)
+                context.publish("add_header__name_update")
             }
 
             "header_value_update" => {
-                state.header.to_mut().value.set(value.to_string());
+                state
+                    .header
+                    .to_mut()
+                    .value
+                    .set(value.as_str().unwrap().to_string());
                 state.header.to_mut().update_common();
 
-                context.publish("add_header__value_update", |state| &state.header)
+                context.publish("add_header__value_update")
             }
 
             "name_input_focus" | "value_input_focus" => {
-                context.set_focus("id", "add_header_window");
+                context.components.by_name("add_header_window").focus();
             }
 
             _ => {}
@@ -266,25 +273,29 @@ impl Component for AddHeaderWindow {
         &mut self,
         key: component::KeyEvent,
         _state: &mut Self::State,
-        _elements: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        _elements: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match key.code {
             KeyCode::Esc => {
-                context.publish("add_header__cancel", |state| &state.header);
+                context.publish("add_header__cancel");
             }
 
             KeyCode::Char(char) => {
                 match char {
-                    's' => context.publish("add_header__submit", |state| &state.header),
+                    's' => context.publish("add_header__submit"),
 
-                    'c' => context.publish("add_header__cancel", |state| &state.header),
+                    'c' => context.publish("add_header__cancel"),
 
                     // Sets focus to header name text input
-                    'n' => context.set_focus("id", "header_name_input"),
+                    'n' => {
+                        context.components.by_name("header_name_input").focus();
+                    }
 
                     // Sets focus to header value text input
-                    'v' => context.set_focus("id", "header_value_input"),
+                    'v' => {
+                        context.components.by_name("header_value_input").focus();
+                    }
 
                     _ => {}
                 }
@@ -323,36 +334,17 @@ impl NewHeader {
 }
 
 impl ::anathema::state::State for NewHeader {
-    fn state_get(
-        &self,
-        path: ::anathema::state::Path<'_>,
-        sub: ::anathema::state::Subscriber,
-    ) -> ::core::prelude::v1::Option<::anathema::state::ValueRef> {
-        let ::anathema::state::Path::Key(key) = path else {
-            return ::core::prelude::v1::None;
-        };
-        match key {
-            "name" => ::core::prelude::v1::Some(self.name.value_ref(sub)),
-            "value" => ::core::prelude::v1::Some(self.value.value_ref(sub)),
-            _ => ::core::prelude::v1::None,
-        }
+    fn type_info(&self) -> anathema::state::Type {
+        anathema::state::Type::String
     }
+}
 
-    fn state_lookup(
-        &self,
-        path: ::anathema::state::Path<'_>,
-    ) -> ::core::prelude::v1::Option<::anathema::state::PendingValue> {
-        let ::anathema::state::Path::Key(key) = path else {
-            return ::core::prelude::v1::None;
-        };
+impl AnyMap for NewHeader {
+    fn lookup(&self, key: &str) -> Option<anathema::state::PendingValue> {
         match key {
-            "name" => ::core::prelude::v1::Some(self.name.to_pending()),
-            "value" => ::core::prelude::v1::Some(self.value.to_pending()),
-            _ => ::core::prelude::v1::None,
+            "name" => Some(self.name.reference()),
+            "value" => Some(self.value.reference()),
+            _ => None,
         }
-    }
-
-    fn to_common(&self) -> ::core::prelude::v1::Option<::anathema::state::CommonVal<'_>> {
-        Some(CommonVal::Str(&self.common))
     }
 }

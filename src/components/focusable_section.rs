@@ -2,9 +2,9 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use anathema::{
     component::{Component, ComponentId},
-    prelude::{ToSourceKind, TuiBackend},
-    runtime::RuntimeBuilder,
-    state::{State, Value},
+    prelude::ToSourceKind,
+    runtime::Builder,
+    state::{AnyState, State, Value},
 };
 
 use crate::theme::{get_app_theme, AppTheme};
@@ -18,14 +18,14 @@ pub struct FocusableSection {
 impl FocusableSection {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
         ident: impl Into<String>,
         template: impl ToSourceKind,
     ) -> anyhow::Result<()> {
         let name: String = ident.into();
         let input_template = template;
 
-        let app_id = builder.register_component(
+        let app_id = builder.component(
             name.clone(),
             input_template,
             FocusableSection {
@@ -89,19 +89,19 @@ impl Component for FocusableSection {
     fn tick(
         &mut self,
         state: &mut Self::State,
-        _elements: anathema::widgets::Elements<'_, '_>,
-        context: anathema::prelude::Context<'_, Self::State>,
+        _elements: anathema::component::Children,
+        context: anathema::prelude::Context<'_, '_, Self::State>,
         _dt: std::time::Duration,
     ) {
         if state.target.to_ref().is_some() {
             return;
         }
 
-        let Some(target) = context.get_external("target") else {
+        let Some(target) = context.attribute("target") else {
             return;
         };
 
-        if let Some(target) = target.to_common() {
+        if let Some(target) = target.as_str() {
             state.target.set(Some(target.to_string()));
         }
     }
@@ -110,8 +110,8 @@ impl Component for FocusableSection {
         &mut self,
         message: Self::Message,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match message.as_str() {
             "unfocus" => {
@@ -136,10 +136,10 @@ impl Component for FocusableSection {
     fn receive(
         &mut self,
         ident: &str,
-        value: anathema::state::CommonVal<'_>,
+        value: &dyn AnyState,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         if state.target.to_ref().is_none() {
             return;
@@ -148,7 +148,7 @@ impl Component for FocusableSection {
         #[allow(clippy::single_match)]
         match ident {
             "url_input_focus" => {
-                let focus = value.to_bool();
+                let &focus = value.to::<bool>();
                 // dbg!(&focus);
 
                 match focus {

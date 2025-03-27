@@ -2,10 +2,9 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use anathema::{
     component::{self, Component, ComponentId},
-    prelude::{self, Context, TuiBackend},
-    runtime::RuntimeBuilder,
-    state::{CommonVal, State, Value},
-    widgets::{self, Elements},
+    prelude::{self, Context},
+    runtime::Builder,
+    state::{AnyMap, AnyState, State, TypeId, Value},
 };
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -37,26 +36,24 @@ pub struct AddProjectVariable {
 
 impl DashboardMessageHandler for AddProjectVariable {
     fn handle_message(
-        value: CommonVal<'_>,
+        value: &dyn AnyState,
         ident: impl Into<String>,
         state: &mut components::dashboard::DashboardState,
-        mut context: prelude::Context<'_, components::dashboard::DashboardState>,
-        _: Elements<'_, '_>,
+        mut context: prelude::Context<'_, '_, components::dashboard::DashboardState>,
+        _: anathema::component::Children,
         component_ids: std::cell::Ref<'_, HashMap<String, ComponentId<String>>>,
     ) {
         let event: String = ident.into();
         match event.as_str() {
             "add_project_variable__submit" => {
                 let persisted_variable: PersistedVariable =
-                    serde_json::from_str(&value.to_string()).expect("???");
+                    serde_json::from_str(value.as_str().unwrap()).expect("???");
                 let project_variable: ProjectVariable = persisted_variable.into();
 
                 state.project.to_mut().variable.push(project_variable);
-
                 state.floating_window.set(FloatingWindow::None);
 
-                context.set_focus("id", "app");
-
+                context.components.by_name("app").focus();
                 if let Ok(message) = to_string(&AddProjectVariableMessages::ClearInput) {
                     let _ = send_message(
                         "add_project_variable",
@@ -69,8 +66,7 @@ impl DashboardMessageHandler for AddProjectVariable {
 
             "add_project_variable__cancel" => {
                 state.floating_window.set(FloatingWindow::None);
-
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
             }
             _ => {}
         }
@@ -88,8 +84,8 @@ impl Component for AddProjectVariable {
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        _: prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: prelude::Context<'_, '_, Self::State>,
     ) {
         self.update_app_theme(state);
     }
@@ -98,8 +94,8 @@ impl Component for AddProjectVariable {
         &mut self,
         message: Self::Message,
         state: &mut Self::State,
-        _: widgets::Elements<'_, '_>,
-        mut context: prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: prelude::Context<'_, '_, Self::State>,
     ) {
         if let Ok(msg) = from_str::<AddProjectVariableMessages>(&message) {
             match msg {
@@ -129,7 +125,10 @@ impl Component for AddProjectVariable {
                 }
 
                 AddProjectVariableMessages::InitialFocus => {
-                    context.set_focus("id", "add_project_variable_name");
+                    context
+                        .components
+                        .by_name("add_project_variable_name")
+                        .focus();
                 }
 
                 AddProjectVariableMessages::Specifically((
@@ -175,7 +174,10 @@ impl Component for AddProjectVariable {
                     self.persisted_project_name = Some(project_name);
                     self.persisted_variable = Some(persisted_variable);
 
-                    context.set_focus("id", "add_project_variable_name");
+                    context
+                        .components
+                        .by_name("add_project_variable_name")
+                        .focus();
                 }
             }
         }
@@ -184,31 +186,45 @@ impl Component for AddProjectVariable {
     fn receive(
         &mut self,
         ident: &str,
-        value: CommonVal<'_>,
+        value: &dyn AnyState,
         state: &mut Self::State,
-        _: widgets::Elements<'_, '_>,
-        mut context: prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: prelude::Context<'_, '_, Self::State>,
     ) {
         #[allow(clippy::single_match)]
         match ident {
-            "add_project_variable_name_escape" => context.set_focus("id", "add_project_variable"),
+            "add_project_variable_name_escape" => {
+                context.components.by_name("add_project_variable").focus();
+            }
             "add_project_variable_name_update" => {
-                state.variable.to_mut().name.set(value.to_string());
+                state
+                    .variable
+                    .to_mut()
+                    .name
+                    .set(value.as_str().unwrap().to_string());
                 state.variable.to_mut().update_common();
             }
 
             "add_project_variable_public_value_escape" => {
-                context.set_focus("id", "add_project_variable")
+                context.components.by_name("add_project_variable").focus();
             }
             "add_project_variable_public_value_update" => {
-                state.variable.to_mut().public.set(value.to_string());
+                state
+                    .variable
+                    .to_mut()
+                    .public
+                    .set(value.as_str().unwrap().to_string());
                 state.variable.to_mut().update_common();
             }
             "add_project_variable_private_value_escape" => {
-                context.set_focus("id", "add_project_variable")
+                context.components.by_name("add_project_variable").focus();
             }
             "add_project_variable_private_value_update" => {
-                state.variable.to_mut().private.set(value.to_string());
+                state
+                    .variable
+                    .to_mut()
+                    .private
+                    .set(value.as_str().unwrap().to_string());
                 state.variable.to_mut().update_common();
             }
             _ => {}
@@ -219,24 +235,43 @@ impl Component for AddProjectVariable {
         &mut self,
         key: component::KeyEvent,
         _: &mut Self::State,
-        _: widgets::Elements<'_, '_>,
-        mut context: prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: prelude::Context<'_, '_, Self::State>,
     ) {
         match key.code {
             component::KeyCode::Char(char) => match char {
-                'v' => context.set_focus("id", "add_project_variable_name"),
-                'u' => context.set_focus("id", "add_project_variable_public_value"),
-                'p' => context.set_focus("id", "add_project_variable_private_value"),
+                'v' => {
+                    context
+                        .components
+                        .by_name("add_project_variable_name")
+                        .focus();
+                }
+                'u' => {
+                    context
+                        .components
+                        .by_name("add_project_variable_public_value")
+                        .focus();
+                }
+                'p' => {
+                    context
+                        .components
+                        .by_name("add_project_variable_private_value")
+                        .focus();
+                }
 
-                's' => context.publish("add_project_variable__submit", |state| &state.variable),
+                's' => {
+                    context.publish("add_project_variable__submit")
+                }
 
-                'c' => context.publish("add_project_variable__cancel", |state| &state.variable),
+                'c' => {
+                    context.publish("add_project_variable__cancel")
+                }
 
                 _ => {}
             },
 
             component::KeyCode::Esc => {
-                context.publish("add_project_variable__cancel", |state| &state.cancel)
+                context.publish("add_project_variable__cancel")
             }
 
             _ => {}
@@ -247,7 +282,7 @@ impl Component for AddProjectVariable {
 impl AddProjectVariable {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
     ) -> Result<()> {
         let app_theme = get_app_theme();
 
@@ -258,7 +293,7 @@ impl AddProjectVariable {
             common: String::from(""),
         };
 
-        let id = builder.register_component(
+        let id = builder.component(
             "add_project_variable",
             template("floating_windows/templates/add_project_variable"),
             AddProjectVariable {
@@ -291,7 +326,7 @@ impl AddProjectVariable {
         &self,
         ident: &str,
         value: &str,
-        context: &mut Context<'_, AddProjectVariableState>,
+        context: &mut Context<'_, '_, AddProjectVariableState>,
     ) {
         let Ok(ids) = self.component_ids.try_borrow() else {
             return;
@@ -330,46 +365,30 @@ impl Variable {
 }
 
 impl ::anathema::state::State for Variable {
-    fn state_get(
-        &self,
-        path: ::anathema::state::Path<'_>,
-        sub: ::anathema::state::Subscriber,
-    ) -> ::core::prelude::v1::Option<::anathema::state::ValueRef> {
-        let ::anathema::state::Path::Key(key) = path else {
-            return ::core::prelude::v1::None;
-        };
+    fn type_info(&self) -> anathema::state::Type {
+        anathema::state::Type::String
+    }
+}
+
+impl AnyMap for Variable {
+    fn lookup(&self, key: &str) -> Option<anathema::state::PendingValue> {
         match key {
-            "name" => ::core::prelude::v1::Some(self.name.value_ref(sub)),
-            "public" => ::core::prelude::v1::Some(self.public.value_ref(sub)),
-            "private" => ::core::prelude::v1::Some(self.private.value_ref(sub)),
-            _ => ::core::prelude::v1::None,
+            "name" => Some(self.name.reference()),
+            "public" => Some(self.public.reference()),
+            "private" => Some(self.private.reference()),
+            _ => None,
         }
     }
+}
 
-    fn state_lookup(
-        &self,
-        path: ::anathema::state::Path<'_>,
-    ) -> ::core::prelude::v1::Option<::anathema::state::PendingValue> {
-        let ::anathema::state::Path::Key(key) = path else {
-            return ::core::prelude::v1::None;
-        };
-        match key {
-            "name" => ::core::prelude::v1::Some(self.name.to_pending()),
-            "public" => ::core::prelude::v1::Some(self.public.to_pending()),
-            "private" => ::core::prelude::v1::Some(self.private.to_pending()),
-            _ => ::core::prelude::v1::None,
-        }
-    }
-
-    fn to_common(&self) -> ::core::prelude::v1::Option<::anathema::state::CommonVal<'_>> {
-        Some(CommonVal::Str(&self.common))
-    }
+impl TypeId for Variable {
+    const TYPE: anathema::state::Type = anathema::state::Type::String;
 }
 
 struct Cancel;
 impl State for Cancel {
-    fn to_common(&self) -> Option<CommonVal<'_>> {
-        Some(CommonVal::Str(""))
+    fn type_info(&self) -> anathema::state::Type {
+        anathema::state::Type::Unit
     }
 }
 

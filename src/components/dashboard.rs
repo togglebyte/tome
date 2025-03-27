@@ -1,9 +1,8 @@
 use anathema::{
     component::{ComponentId, KeyCode, KeyEvent},
-    prelude::{Context, TuiBackend},
-    runtime::RuntimeBuilder,
-    state::{CommonVal, List, Value},
-    widgets::Elements,
+    prelude::Context,
+    runtime::Builder,
+    state::{AnyState, List, Value},
 };
 use std::ops::Deref;
 use std::{
@@ -69,14 +68,16 @@ pub enum DashboardDisplay {
 }
 
 impl anathema::state::State for DashboardDisplay {
-    fn to_common(&self) -> Option<CommonVal<'_>> {
+    fn type_info(&self) -> anathema::state::Type {
+        anathema::state::Type::String
+    }
+
+    fn as_str(&self) -> Option<&str> {
         match self {
-            DashboardDisplay::RequestBody => Some(CommonVal::Str("request_body")),
-            DashboardDisplay::RequestHeadersEditor => {
-                Some(CommonVal::Str("request_headers_editor"))
-            }
-            DashboardDisplay::ResponseBody => Some(CommonVal::Str("response_body")),
-            DashboardDisplay::ResponseHeaders => Some(CommonVal::Str("response_headers")),
+            Self::RequestBody => Some("request_body"),
+            Self::RequestHeadersEditor => Some("request_headers_editor"),
+            Self::ResponseBody => Some("response_body"),
+            Self::ResponseHeaders => Some("response_headers"),
         }
     }
 }
@@ -174,13 +175,15 @@ impl DashboardState {
                     color: color5,
                     label: "(O)ptions".to_string().into(),
                 },
-            ]),
+            ])
+            .into(),
             top_menu_items: List::from_iter([MenuItem {
                 color,
                 label: "(P)rojects".to_string().into(),
-            }]),
-            response_headers: List::from_iter(vec![]),
-            filter_indexes: List::empty(),
+            }])
+            .into(),
+            response_headers: List::empty().into(),
+            filter_indexes: List::empty().into(),
             filter_total: 0.into(),
             filter_nav_index: 0.into(),
             app_bg: "#000000".to_string().into(),
@@ -197,7 +200,7 @@ pub struct DashboardComponent {
 impl DashboardComponent {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
     ) -> anyhow::Result<()> {
         let theme = get_highlight_theme(None);
 
@@ -210,7 +213,7 @@ impl DashboardComponent {
             .app_bg
             .set(format!("#{:02X}{:02X}{:02X}", color.r, color.g, color.b));
 
-        let id = builder.register_component(
+        let id = builder.component(
             "dashboard",
             template("templates/dashboard"),
             DashboardComponent {
@@ -260,7 +263,7 @@ impl DashboardComponent {
         }
     }
 
-    fn send_options_open(&self, _: &mut DashboardState, context: Context<'_, DashboardState>) {
+    fn send_options_open(&self, _: &mut DashboardState, context: Context<'_, '_, DashboardState>) {
         let component_ids = self.component_ids.try_borrow();
         if component_ids.is_err() {
             return;
@@ -282,11 +285,11 @@ impl DashboardComponent {
         &self,
         value: &str,
         state: &mut DashboardState,
-        context: &mut Context<'_, DashboardState>,
+        context: &mut Context<'_, '_, DashboardState>,
     ) {
         let Ok(variable) = serde_json::from_str::<PersistedVariable>(value) else {
             state.floating_window.set(FloatingWindow::None);
-            context.set_focus("id", "app");
+            context.components.by_name("app").focus();
 
             return;
         };
@@ -317,7 +320,7 @@ impl DashboardComponent {
         state
             .floating_window
             .set(FloatingWindow::AddProjectVariable);
-        context.set_focus("id", "add_project_variable");
+        context.components.by_name("add_project_variable").focus();
 
         let _ = send_message("add_project_variable", message, &ids, context.emitter);
     }
@@ -326,11 +329,11 @@ impl DashboardComponent {
         &self,
         value: &str,
         state: &mut DashboardState,
-        context: &mut Context<'_, DashboardState>,
+        context: &mut Context<'_, '_, DashboardState>,
     ) {
         let Ok(endpoint) = serde_json::from_str::<PersistedEndpoint>(value) else {
             state.floating_window.set(FloatingWindow::None);
-            context.set_focus("id", "app");
+            context.components.by_name("app").focus();
 
             return;
         };
@@ -358,7 +361,7 @@ impl DashboardComponent {
         state
             .floating_window
             .set(FloatingWindow::ChangeEndpointName);
-        context.set_focus("id", "edit_endpoint_name");
+        context.components.by_name("edit_endpoint_name").focus();
 
         let _ = send_message("edit_endpoint_name", message, &ids, context.emitter);
     }
@@ -367,11 +370,11 @@ impl DashboardComponent {
         &self,
         value: &str,
         state: &mut DashboardState,
-        context: &mut Context<'_, DashboardState>,
+        context: &mut Context<'_, '_, DashboardState>,
     ) {
         let Ok(project) = serde_json::from_str::<PersistedProject>(value) else {
             state.floating_window.set(FloatingWindow::None);
-            context.set_focus("id", "app");
+            context.components.by_name("app").focus();
 
             return;
         };
@@ -386,12 +389,16 @@ impl DashboardComponent {
         };
 
         state.floating_window.set(FloatingWindow::ChangeProjectName);
-        context.set_focus("id", "edit_project_name");
+        context.components.by_name("edit_project_name").focus();
 
         let _ = send_message("edit_project_name", message, &ids, context.emitter);
     }
 
-    fn new_project(&self, state: &mut DashboardState, context: &mut Context<'_, DashboardState>) {
+    fn new_project(
+        &self,
+        state: &mut DashboardState,
+        context: &mut Context<'_, '_, DashboardState>,
+    ) {
         self.save_project(state, false);
 
         state.project.set(Project::new());
@@ -400,17 +407,17 @@ impl DashboardComponent {
         self.clear_url_and_request_body(context);
 
         state.floating_window.set(FloatingWindow::None);
-        context.set_focus("id", "app");
+        context.components.by_name("app").focus();
     }
 
-    fn new_endpoint(&self, state: &mut DashboardState, context: Context<'_, DashboardState>) {
+    fn new_endpoint(&self, state: &mut DashboardState, context: Context<'_, '_, DashboardState>) {
         self.save_endpoint(state, &context, false);
 
         state.endpoint = Endpoint::new().into();
         self.clear_url_and_request_body(&context);
     }
 
-    fn clear_url_and_request_body(&self, context: &Context<'_, DashboardState>) {
+    fn clear_url_and_request_body(&self, context: &Context<'_, '_, DashboardState>) {
         if let Ok(component_ids) = self.component_ids.try_borrow() {
             let url = String::from("");
             let _ = send_message("url_text_input", url, &component_ids, context.emitter);
@@ -431,7 +438,7 @@ impl DashboardComponent {
     fn save_endpoint(
         &self,
         state: &mut DashboardState,
-        _: &Context<'_, DashboardState>,
+        _: &Context<'_, '_, DashboardState>,
         show_message: bool,
     ) {
         let project_name = state.project.to_ref().name.to_ref().to_string();
@@ -477,11 +484,10 @@ impl DashboardComponent {
     fn open_edit_project_name_window(
         &self,
         state: &mut DashboardState,
-        mut context: Context<'_, DashboardState>,
+        mut context: Context<'_, '_, DashboardState>,
     ) {
         state.floating_window.set(FloatingWindow::ChangeProjectName);
-
-        context.set_focus("id", "edit_project_name");
+        context.components.by_name("edit_project_name").focus();
 
         if let Ok(ids) = self.component_ids.try_borrow() {
             let mut input_value = state.project.to_ref().name.to_ref().clone();
@@ -499,10 +505,13 @@ impl DashboardComponent {
     fn open_endpoints_selector(
         &self,
         state: &mut DashboardState,
-        mut context: Context<'_, DashboardState>,
+        mut context: Context<'_, '_, DashboardState>,
     ) {
         state.floating_window.set(FloatingWindow::EndpointsSelector);
-        context.set_focus("id", "endpoints_selector_window");
+        context
+            .components
+            .by_name("endpoints_selector_window")
+            .focus();
 
         let persisted_endpoints: Vec<PersistedEndpoint> = state
             .project
@@ -536,12 +545,12 @@ impl DashboardComponent {
     fn open_edit_endpoint_name_window(
         &self,
         state: &mut DashboardState,
-        mut context: Context<'_, DashboardState>,
+        mut context: Context<'_, '_, DashboardState>,
     ) {
         state
             .floating_window
             .set(FloatingWindow::ChangeEndpointName);
-        context.set_focus("id", "edit_endpoint_name");
+        context.components.by_name("edit_endpoint_name").focus();
 
         if let Ok(ids) = self.component_ids.try_borrow() {
             let mut input_value = state.endpoint.to_ref().name.to_ref().clone();
@@ -583,28 +592,28 @@ impl DashboardComponent {
     fn open_commands_window(
         &self,
         state: &mut DashboardState,
-        mut context: Context<'_, DashboardState>,
+        mut context: Context<'_, '_, DashboardState>,
     ) {
         state.floating_window.set(FloatingWindow::Commands);
-        context.set_focus("id", "commands_window");
+        context.components.by_name("commands_window").focus();
     }
 
     fn open_body_mode_selector(
         &self,
         state: &mut DashboardState,
-        mut context: Context<'_, DashboardState>,
+        mut context: Context<'_, '_, DashboardState>,
     ) {
         state.floating_window.set(FloatingWindow::BodyModeSelector);
-        context.set_focus("id", "body_mode_selector");
+        context.components.by_name("body_mode_selector").focus();
     }
 
     fn open_add_header_window(
         &self,
         state: &mut DashboardState,
-        mut context: Context<'_, DashboardState>,
+        mut context: Context<'_, '_, DashboardState>,
     ) {
         state.floating_window.set(FloatingWindow::AddHeader);
-        context.set_focus("id", "add_header_window");
+        context.components.by_name("add_header_window").focus();
 
         let Ok(ids) = self.component_ids.try_borrow() else {
             return;
@@ -622,7 +631,7 @@ impl DashboardComponent {
         &self,
         confirm_action: ConfirmAction,
         state: &mut DashboardState,
-        mut context: Context<'_, DashboardState>,
+        mut context: Context<'_, '_, DashboardState>,
     ) {
         match confirm_action {
             ConfirmAction::ConfirmationDeleteHeader(delete_header_answer) => {
@@ -677,7 +686,7 @@ impl DashboardComponent {
 
                     false => {
                         state.floating_window.set(FloatingWindow::None);
-                        context.set_focus("id", "app");
+                        context.components.by_name("app").focus();
                     }
                 }
             }
@@ -714,7 +723,7 @@ impl DashboardComponent {
 
                     false => {
                         state.floating_window.set(FloatingWindow::None);
-                        context.set_focus("id", "app");
+                        context.components.by_name("app").focus();
                     }
                 }
             }
@@ -756,7 +765,7 @@ impl DashboardComponent {
 
                     false => {
                         state.floating_window.set(FloatingWindow::None);
-                        context.set_focus("id", "app");
+                        context.components.by_name("app").focus();
                     }
                 }
             }
@@ -804,7 +813,7 @@ impl DashboardComponent {
 
                 false => {
                     state.floating_window.set(FloatingWindow::None);
-                    context.set_focus("id", "app");
+                    context.components.by_name("app").focus();
                 }
             },
 
@@ -815,11 +824,11 @@ impl DashboardComponent {
 
 pub trait DashboardMessageHandler {
     fn handle_message(
-        value: CommonVal<'_>,
+        value: &dyn AnyState,
         ident: impl Into<String>,
         state: &mut DashboardState,
-        context: Context<'_, DashboardState>,
-        elements: Elements<'_, '_>,
+        context: Context<'_, '_, DashboardState>,
+        elements: anathema::component::Children,
         component_ids: Ref<'_, HashMap<String, ComponentId<String>>>,
     );
 }
@@ -842,8 +851,8 @@ impl anathema::component::Component for DashboardComponent {
         &mut self,
         message: Self::Message,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        mut context: Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: Context<'_, '_, Self::State>,
     ) {
         if let Ok(dashboard_message) = serde_json::from_str::<DashboardMessages>(&message) {
             match dashboard_message {
@@ -894,7 +903,7 @@ impl anathema::component::Component for DashboardComponent {
                     #[allow(clippy::single_match)]
                     TextInputMessages::Escape(text_update) => match text_update.id.as_str() {
                         "endpoint_url_input" => {
-                            context.set_focus("id", "app");
+                            context.components.by_name("app").focus();
 
                             if let Ok(ids) = self.component_ids.try_borrow() {
                                 let _ = send_message(
@@ -927,16 +936,16 @@ impl anathema::component::Component for DashboardComponent {
     fn receive(
         &mut self,
         ident: &str,
-        value: CommonVal<'_>,
+        value: &dyn AnyState,
         state: &mut Self::State,
-        elements: Elements<'_, '_>,
-        mut context: Context<'_, Self::State>,
+        elements: anathema::component::Children,
+        mut context: Context<'_, '_, Self::State>,
     ) {
         #[allow(clippy::single_match)]
         match ident {
             // Unfocus the url input and set back to dashboard
             "url_input_focus" => {
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
             }
 
             "add_new_project" => {
@@ -944,22 +953,22 @@ impl anathema::component::Component for DashboardComponent {
             }
 
             "rename_project" => {
-                self.rename_project(&value.to_string(), state, &mut context);
+                self.rename_project(value.as_str().unwrap(), state, &mut context);
             }
 
             "rename_endpoint" => {
-                self.rename_endpoint(&value.to_string(), state, &mut context);
+                self.rename_endpoint(value.as_str().unwrap(), state, &mut context);
             }
 
             "rename_variable" => {
-                self.rename_variable(&value.to_string(), state, &mut context);
+                self.rename_variable(value.as_str().unwrap(), state, &mut context);
             }
 
             "open_add_variable_window" => {
                 state
                     .floating_window
                     .set(FloatingWindow::AddProjectVariable);
-                context.set_focus("id", "add_project_variable");
+                context.components.by_name("add_project_variable").focus();
 
                 let Ok(message) = serde_json::to_string(&AddProjectVariableMessages::InitialFocus)
                 else {
@@ -1123,8 +1132,8 @@ impl anathema::component::Component for DashboardComponent {
         &mut self,
         event: KeyEvent,
         state: &mut Self::State,
-        elements: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        elements: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match event.code {
             KeyCode::Char(char) => {
@@ -1136,7 +1145,7 @@ impl anathema::component::Component for DashboardComponent {
                     'n' => self.open_edit_endpoint_name_window(state, context),
                     'j' => self.open_edit_project_name_window(state, context),
                     'i' => self.save_endpoint(state, &context, true),
-                    // 'f' => context.set_focus("id", "response_body_input"),
+                    // 'f' => context.components.by_name("response_body_input").focus(); ,
                     'o' => self.send_options_open(state, context),
                     't' => self.new_endpoint(state, context),
                     'w' => self.new_project(state, &mut context),
@@ -1151,7 +1160,7 @@ impl anathema::component::Component for DashboardComponent {
                     // Set focus to the request url text input
                     'u' => {
                         if !event.ctrl {
-                            context.set_focus("id", "url_input");
+                            context.components.by_name("url_input").focus();
                         }
                     }
 
@@ -1171,14 +1180,16 @@ impl anathema::component::Component for DashboardComponent {
 
                     // Show request body editor window
                     'b' => match main_display {
-                        DashboardDisplay::RequestBody => context.set_focus("id", "textarea"),
+                        DashboardDisplay::RequestBody => {
+                            //context.set_focus("id", "textarea")
+                        }
                         DashboardDisplay::RequestHeadersEditor => {
                             state.main_display.set(DashboardDisplay::RequestBody);
                         }
                         DashboardDisplay::ResponseBody => {
                             // NOTE: Maybe revert this, needs testing to check focus UX
                             // state.main_display.set(DashboardDisplay::RequestBody);
-                            context.set_focus("id", "response_renderer");
+                            context.components.by_name("response_renderer").focus();
                         }
                         DashboardDisplay::ResponseHeaders => {
                             state.main_display.set(DashboardDisplay::ResponseBody)
@@ -1203,7 +1214,7 @@ impl anathema::component::Component for DashboardComponent {
                     'p' => {
                         if let Ok(component_ids) = self.component_ids.try_borrow() {
                             state.floating_window.set(FloatingWindow::Project);
-                            context.set_focus("id", "project_selector");
+                            context.components.by_name("project_selector").focus();
 
                             let _ = component_ids.get("project_selector").map(|id| {
                                 context.emit(*id, "projects".to_string());
@@ -1218,7 +1229,7 @@ impl anathema::component::Component for DashboardComponent {
                             state
                                 .floating_window
                                 .set(FloatingWindow::EditHeaderSelector);
-                            context.set_focus("id", "edit_header_selector");
+                            context.components.by_name("edit_header_selector").focus();
 
                             let headers: Vec<Header> = state
                                 .endpoint
@@ -1257,7 +1268,7 @@ impl anathema::component::Component for DashboardComponent {
                     // Open Request Method selection window
                     'm' => {
                         state.floating_window.set(FloatingWindow::Method);
-                        context.set_focus("id", "method_selector");
+                        context.components.by_name("method_selector").focus();
                     }
 
                     'a' => match main_display {
@@ -1287,7 +1298,7 @@ impl anathema::component::Component for DashboardComponent {
             }
 
             KeyCode::Esc => {
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
 
                 if *state.floating_window.to_ref() != FloatingWindow::None {
                     state.floating_window.set(FloatingWindow::None);
@@ -1308,8 +1319,8 @@ impl anathema::component::Component for DashboardComponent {
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        _: anathema::component::Children,
+        context: Context<'_, '_, Self::State>,
     ) {
         update_theme(state);
 

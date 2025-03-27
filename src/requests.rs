@@ -130,8 +130,8 @@ fn test_replace_multiple_incomplete_pairs2() {
 
 pub fn do_request(
     state: &mut DashboardState,
-    context: anathema::prelude::Context<'_, DashboardState>,
-    _: anathema::widgets::Elements<'_, '_>,
+    context: anathema::prelude::Context<'_, '_, DashboardState>,
+    _: anathema::component::Children<'_, '_>,
     dashboard: &mut DashboardComponent,
 ) -> anyhow::Result<()> {
     let project: PersistedProject = (&*state.project.to_ref()).into();
@@ -269,7 +269,7 @@ fn get_extension(content_type: &str) -> String {
 fn handle_successful_response(
     response: Response,
     state: &mut DashboardState,
-    mut context: Context<'_, DashboardState>,
+    mut context: Context<'_, '_, DashboardState>,
     dashboard: &mut DashboardComponent,
 ) -> anyhow::Result<()> {
     let status = response.status();
@@ -332,7 +332,8 @@ fn handle_successful_response(
     state.response_body_window_label.set(window_label);
     state.main_display.set(DashboardDisplay::ResponseBody);
 
-    context.set_focus("id", "response_renderer");
+    // MISSING
+    // context.components.by_name("response_renderer").focus(); ;
 
     let response_msg = ResponseRendererMessages::ResponseUpdate(ext);
     if let Ok(msg) = serde_json::to_string(&response_msg) {
@@ -347,7 +348,7 @@ fn handle_successful_response(
 fn handle_error_response(
     error: ureq::Error,
     state: &mut DashboardState,
-    mut context: Context<'_, DashboardState>,
+    mut context: Context<'_, '_, DashboardState>,
     dashboard: &mut DashboardComponent,
 ) -> anyhow::Result<()> {
     match error {
@@ -363,7 +364,9 @@ fn handle_error_response(
             state.response.set(body.clone());
             state.response_body_window_label.set(window_label);
             state.main_display.set(DashboardDisplay::ResponseBody);
-            context.set_focus("id", "response_renderer");
+
+            // MISSING
+            // context.components.by_name("response_renderer").focus(); ;
 
             // TODO: Once the response headers are being extracted, figure out the correct
             // extension type to use to syntax highlight the response

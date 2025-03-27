@@ -2,9 +2,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use anathema::{
     component::{Component, ComponentId},
-    prelude::TuiBackend,
-    runtime::RuntimeBuilder,
-    state::{State, Value},
+    runtime::Builder,
+    state::{AnyState, State, Value},
 };
 
 use crate::{
@@ -37,9 +36,9 @@ impl ConfirmActionWindow {
 
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
     ) -> anyhow::Result<()> {
-        let id = builder.register_component(
+        let id = builder.component(
             "confirm_action_window",
             template("templates/confirm_action_window"),
             ConfirmActionWindow::new(ids.clone()),
@@ -74,11 +73,11 @@ impl ConfirmActionWindowState {
 
 impl DashboardMessageHandler for ConfirmActionWindow {
     fn handle_message(
-        _: anathema::state::CommonVal<'_>,
+        _: &dyn AnyState,
         ident: impl Into<String>,
         state: &mut super::dashboard::DashboardState,
-        mut context: anathema::prelude::Context<'_, super::dashboard::DashboardState>,
-        _: anathema::widgets::Elements<'_, '_>,
+        mut context: anathema::prelude::Context<'_, '_, super::dashboard::DashboardState>,
+        _: anathema::component::Children,
         _: std::cell::Ref<'_, HashMap<String, ComponentId<String>>>,
     ) {
         let event: String = ident.into();
@@ -87,8 +86,7 @@ impl DashboardMessageHandler for ConfirmActionWindow {
         match event.as_str() {
             "confirm_action__cancel" => {
                 state.floating_window.set(FloatingWindow::None);
-
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
             }
 
             _ => {}
@@ -108,8 +106,8 @@ impl Component for ConfirmActionWindow {
         &mut self,
         key: anathema::component::KeyEvent,
         _: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match key.code {
             anathema::component::KeyCode::Char(char) => match char {
@@ -188,7 +186,7 @@ impl Component for ConfirmActionWindow {
             },
 
             anathema::component::KeyCode::Esc => {
-                context.publish("confirm_action__cancel", |state| &state.title);
+                context.publish("confirm_action__cancel");
             }
 
             _ => {}
@@ -199,8 +197,8 @@ impl Component for ConfirmActionWindow {
         &mut self,
         message: Self::Message,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         let Ok(confirm_action) = serde_json::from_str::<ConfirmAction>(message.as_str()) else {
             // TODO: Close this and send an error message

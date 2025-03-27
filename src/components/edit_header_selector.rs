@@ -7,10 +7,9 @@ use std::{
 
 use anathema::{
     component::{Component, ComponentId},
-    prelude::{Context, TuiBackend},
-    runtime::RuntimeBuilder,
-    state::{List, State, Value},
-    widgets::Elements,
+    prelude::Context,
+    runtime::Builder,
+    state::{AnyState, List, State, Value},
 };
 use serde::{Deserialize, Serialize};
 
@@ -53,7 +52,7 @@ impl EditHeaderSelectorState {
             current_first_index: 0.into(),
             current_last_index: 4.into(),
             visible_rows: 5.into(),
-            window_list: List::empty(),
+            window_list: List::empty().into(),
             selected_item: "".to_string().into(),
             app_theme: app_theme.into(),
         }
@@ -70,9 +69,9 @@ pub struct EditHeaderSelector {
 impl EditHeaderSelector {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
     ) -> anyhow::Result<()> {
-        let id = builder.register_component(
+        let id = builder.component(
             "edit_header_selector",
             template("templates/edit_header_selector"),
             EditHeaderSelector::new(ids.clone()),
@@ -183,7 +182,7 @@ impl EditHeaderSelector {
             }
         }
 
-        let mut new_list_state = List::<HeaderState>::empty();
+        let mut new_list_state = Value::new(List::<HeaderState>::empty());
         new_items_list
             .into_iter()
             .enumerate()
@@ -224,13 +223,13 @@ impl EditHeaderSelector {
                 new_list_state.push(header);
             });
 
-        state.window_list = new_list_state;
+        state.window_list = new_list_state.into();
     }
 
     fn delete_header(
         &self,
         state: &mut EditHeaderSelectorState,
-        mut context: Context<'_, EditHeaderSelectorState>,
+        mut context: Context<'_, '_, EditHeaderSelectorState>,
     ) {
         let selected_index = *state.cursor.to_ref() as usize;
         let persisted_header = self.items_list.get(selected_index);
@@ -239,19 +238,19 @@ impl EditHeaderSelector {
             Some(persisted_header) => match serde_json::to_string(persisted_header) {
                 Ok(project_json) => {
                     state.selected_item.set(project_json);
-                    context.publish("edit_header_selector__delete", |state| &state.selected_item)
+                    context.publish("edit_header_selector__delete")
                 }
 
-                Err(_) => context.publish("edit_header_selector__cancel", |state| &state.cursor),
+                Err(_) => context.publish("edit_header_selector__cancel"),
             },
-            None => context.publish("edit_header_selector__cancel", |state| &state.cursor),
+            None => context.publish("edit_header_selector__cancel"),
         }
     }
 
     fn edit_header(
         &self,
         state: &mut EditHeaderSelectorState,
-        mut context: Context<'_, EditHeaderSelectorState>,
+        mut context: Context<'_, '_, EditHeaderSelectorState>,
     ) {
         let selected_index = *state.cursor.to_ref() as usize;
         let header = self.items_list.get(selected_index);
@@ -260,27 +259,27 @@ impl EditHeaderSelector {
             Some(header) => match serde_json::to_string(header) {
                 Ok(header_json) => {
                     state.selected_item.set(header_json);
-                    context.publish("edit_header_selector__edit", |state| &state.selected_item)
+                    context.publish("edit_header_selector__edit")
                 }
 
-                Err(_) => context.publish("edit_header_selector__cancel", |state| &state.cursor),
+                Err(_) => context.publish("edit_header_selector__cancel"),
             },
-            None => context.publish("edit_header_selector__cancel", |state| &state.cursor),
+            None => context.publish("edit_header_selector__cancel"),
         }
     }
 
-    fn add_header(&self, mut context: Context<'_, EditHeaderSelectorState>) {
-        context.publish("edit_header_selector__add", |state| &state.cursor);
+    fn add_header(&self, mut context: Context<'_, '_, EditHeaderSelectorState>) {
+        context.publish("edit_header_selector__add");
     }
 }
 
 impl DashboardMessageHandler for EditHeaderSelector {
     fn handle_message(
-        value: anathema::state::CommonVal<'_>,
+        value: &dyn AnyState,
         ident: impl Into<String>,
         state: &mut DashboardState,
-        mut context: anathema::prelude::Context<'_, DashboardState>,
-        _: Elements<'_, '_>,
+        mut context: anathema::prelude::Context<'_, '_, DashboardState>,
+        _: anathema::component::Children,
         component_ids: std::cell::Ref<'_, HashMap<String, ComponentId<String>>>,
     ) {
         let event: String = ident.into();
@@ -288,13 +287,13 @@ impl DashboardMessageHandler for EditHeaderSelector {
         match event.as_str() {
             "edit_header_selector__add" => {
                 state.floating_window.set(FloatingWindow::AddHeader);
-                context.set_focus("id", "add_header_window");
+                context.components.by_name("add_header_window").focus();
             }
 
             "edit_header_selector__edit" => {
-                let Ok(header) = serde_json::from_str::<Header>(&value.to_string()) else {
+                let Ok(header) = serde_json::from_str::<Header>(value.as_str().unwrap()) else {
                     state.floating_window.set(FloatingWindow::None);
-                    context.set_focus("id", "app");
+                    context.components.by_name("app").focus();
 
                     return;
                 };
@@ -320,7 +319,7 @@ impl DashboardMessageHandler for EditHeaderSelector {
                 };
 
                 state.floating_window.set(FloatingWindow::AddHeader);
-                context.set_focus("id", "add_header_window");
+                context.components.by_name("add_header_window").focus();
 
                 let _ = send_message(
                     "add_header_window",
@@ -332,14 +331,14 @@ impl DashboardMessageHandler for EditHeaderSelector {
 
             "edit_header_selector__cancel" => {
                 state.floating_window.set(FloatingWindow::None);
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
             }
 
             "edit_header_selector__delete" => {
                 state.floating_window.set(FloatingWindow::ConfirmAction);
-                context.set_focus("id", "confirm_action_window");
+                context.components.by_name("confirm_action_window").focus();
 
-                let value = &*value.to_common_str();
+                let value = value.as_str().unwrap();
                 let header = serde_json::from_str::<Header>(value);
 
                 match header {
@@ -383,8 +382,8 @@ impl Component for EditHeaderSelector {
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         self.update_app_theme(state);
     }
@@ -393,8 +392,8 @@ impl Component for EditHeaderSelector {
         &mut self,
         event: anathema::component::KeyEvent,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match event.code {
             anathema::component::KeyCode::Char(char) => match char {
@@ -411,7 +410,7 @@ impl Component for EditHeaderSelector {
 
             anathema::component::KeyCode::Esc => {
                 // NOTE: This sends cursor to satisfy publish() but is not used
-                context.publish("edit_header_selector__cancel", |state| &state.cursor)
+                context.publish("edit_header_selector__cancel")
             }
 
             _ => {}
@@ -422,8 +421,8 @@ impl Component for EditHeaderSelector {
         &mut self,
         message: Self::Message,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         let endpoints_selector_message =
             serde_json::from_str::<EditHeaderSelectorMessages>(&message);

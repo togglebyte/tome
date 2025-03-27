@@ -2,10 +2,10 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use anathema::{
     component::{Component, ComponentId},
-    prelude::{Context, TuiBackend},
-    runtime::RuntimeBuilder,
-    state::{CommonVal, State, Value},
-    widgets::Elements,
+    derive::State,
+    prelude::Context,
+    runtime::Builder,
+    state::{AnyMap, AnyState, PendingValue, TypeId, Value},
 };
 use serde::{Deserialize, Serialize};
 
@@ -37,18 +37,22 @@ pub struct EditProjectName {
 
 impl DashboardMessageHandler for EditProjectName {
     fn handle_message(
-        value: anathema::state::CommonVal<'_>,
+        value: &dyn AnyState,
         ident: impl Into<String>,
         state: &mut crate::components::dashboard::DashboardState,
-        mut context: anathema::prelude::Context<'_, crate::components::dashboard::DashboardState>,
-        _: Elements<'_, '_>,
+        mut context: anathema::prelude::Context<
+            '_,
+            '_,
+            crate::components::dashboard::DashboardState,
+        >,
+        _: anathema::component::Children,
         component_ids: std::cell::Ref<'_, HashMap<String, ComponentId<String>>>,
     ) {
         let event: String = ident.into();
         match event.as_str() {
             "edit_project_name__specific_project_rename" => {
                 let Ok(specific_name_update) =
-                    serde_json::from_str::<SpecificNameUpdate>(&value.to_string())
+                    serde_json::from_str::<SpecificNameUpdate>(&value.as_str().unwrap())
                 else {
                     let error_message =
                         "There was an error while processing the name update".to_string();
@@ -71,8 +75,7 @@ impl DashboardMessageHandler for EditProjectName {
                 }
 
                 state.floating_window.set(FloatingWindow::None);
-
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
 
                 if let Ok(message) = serde_json::to_string(&EditProjectNameMessages::ClearInput) {
                     let _ = send_message(
@@ -85,12 +88,11 @@ impl DashboardMessageHandler for EditProjectName {
             }
 
             "edit_project_name__submit" => {
-                let new_name = value.to_string();
-                state.project.to_mut().name.set(new_name);
+                let new_name = value.as_str().unwrap();
+                state.project.to_mut().name.set(new_name.to_string());
 
                 state.floating_window.set(FloatingWindow::None);
-
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
 
                 if let Ok(message) = serde_json::to_string(&EditProjectNameMessages::ClearInput) {
                     let _ = send_message(
@@ -104,8 +106,7 @@ impl DashboardMessageHandler for EditProjectName {
 
             "edit_project_name__cancel" => {
                 state.floating_window.set(FloatingWindow::None);
-
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
             }
             _ => {}
         }
@@ -123,8 +124,8 @@ impl Component for EditProjectName {
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         self.update_app_theme(state);
     }
@@ -133,8 +134,8 @@ impl Component for EditProjectName {
         &mut self,
         message: Self::Message,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        context: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         if let Ok(msg) = serde_json::from_str::<EditProjectNameMessages>(&message) {
             match msg {
@@ -172,15 +173,17 @@ impl Component for EditProjectName {
     fn receive(
         &mut self,
         ident: &str,
-        value: anathema::state::CommonVal<'_>,
+        value: &dyn AnyState,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         #[allow(clippy::single_match)]
         match ident {
-            "name_input_escape" => context.set_focus("id", "edit_project_name"),
-            "name_input_update" => state.name.set(value.to_string()),
+            "name_input_escape" => {
+                context.components.by_name("edit_project_name").focus();
+            }
+            "name_input_update" => state.name.set(value.as_str().unwrap().to_string()),
             _ => {}
         }
     }
@@ -189,26 +192,30 @@ impl Component for EditProjectName {
         &mut self,
         key: anathema::component::KeyEvent,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match key.code {
             anathema::component::KeyCode::Char(char) => match char {
-                'p' => context.set_focus("id", "project_name_input"),
+                'p' => {
+                    context.components.by_name("project_name_input").focus();
+                }
                 's' => match &self.persisted_project {
                     Some(persisted_project) => {
                         self.rename_specific_project(persisted_project, state, context);
                     }
                     None => {
-                        context.publish("edit_project_name__submit", |state| &state.name);
+                        context.publish("edit_project_name__submit");
                     }
                 },
-                'c' => context.publish("edit_project_name__cancel", |state| &state.name),
+                'c' => {
+                    context.publish("edit_project_name__cancel")
+                }
 
                 _ => {}
             },
             anathema::component::KeyCode::Esc => {
-                context.publish("edit_project_name__cancel", |state| &state.name)
+                context.publish("edit_project_name__cancel")
             }
 
             _ => {}
@@ -219,11 +226,11 @@ impl Component for EditProjectName {
 impl EditProjectName {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
     ) -> anyhow::Result<()> {
         let app_theme = get_app_theme();
 
-        let id = builder.register_component(
+        let id = builder.component(
             "edit_project_name",
             template("floating_windows/templates/edit_project_name"),
             EditProjectName {
@@ -248,7 +255,11 @@ impl EditProjectName {
         state.app_theme.set(app_theme);
     }
 
-    fn set_name_input(&self, input_value: &str, mut context: Context<'_, EditProjectNameState>) {
+    fn set_name_input(
+        &self,
+        input_value: &str,
+        mut context: Context<'_, '_, EditProjectNameState>,
+    ) {
         if let Ok(ids) = self.component_ids.try_borrow() {
             let _ = send_message(
                 "edit_project_name_input",
@@ -258,14 +269,14 @@ impl EditProjectName {
             );
         }
 
-        context.set_focus("id", "project_name_input");
+        context.components.by_name("project_name_input").focus();
     }
 
     fn rename_specific_project(
         &self,
         project: &PersistedProject,
         state: &mut EditProjectNameState,
-        mut context: Context<'_, EditProjectNameState>,
+        mut context: Context<'_, '_, EditProjectNameState>,
     ) {
         let specific_name_update = SpecificNameUpdate {
             old_name: project.name.to_string(),
@@ -297,9 +308,9 @@ impl EditProjectName {
 
         match rename_project(project, &state.name.to_ref()) {
             Ok(_) => {
-                context.publish("edit_project_name__specific_project_rename", |state| {
-                    &state.specific_name_change
-                });
+                // context.publish("edit_project_name__specific_project_rename", |state| {
+                //     &state.specific_name_change
+                // });
             }
             Err(_) => {
                 let error_message = "There was an error renaming the project".to_string();
@@ -329,7 +340,6 @@ pub struct SpecificNameUpdate {
 pub struct EditProjectNameState {
     app_theme: Value<AppTheme>,
     name: Value<String>,
-
     specific_name_change: Value<Option<SpecificNameChange>>,
 }
 
@@ -339,37 +349,22 @@ pub struct SpecificNameChange {
     pub common: String,
 }
 
-impl ::anathema::state::State for SpecificNameChange {
-    fn state_get(
-        &self,
-        path: ::anathema::state::Path<'_>,
-        sub: ::anathema::state::Subscriber,
-    ) -> ::core::prelude::v1::Option<::anathema::state::ValueRef> {
-        let ::anathema::state::Path::Key(key) = path else {
-            return ::core::prelude::v1::None;
-        };
-        match key {
-            "old_name" => ::core::prelude::v1::Some(self.old_name.value_ref(sub)),
-            "new_name" => ::core::prelude::v1::Some(self.new_name.value_ref(sub)),
-            _ => ::core::prelude::v1::None,
-        }
+impl anathema::component::State for SpecificNameChange {
+    fn type_info(&self) -> anathema::state::Type {
+        anathema::state::Type::String
     }
+}
 
-    fn state_lookup(
-        &self,
-        path: ::anathema::state::Path<'_>,
-    ) -> ::core::prelude::v1::Option<::anathema::state::PendingValue> {
-        let ::anathema::state::Path::Key(key) = path else {
-            return ::core::prelude::v1::None;
-        };
+impl TypeId for SpecificNameChange {
+    const TYPE: anathema::state::Type = anathema::state::Type::String;
+}
+
+impl AnyMap for SpecificNameChange {
+    fn lookup(&self, key: &str) -> Option<PendingValue> {
         match key {
-            "old_name" => ::core::prelude::v1::Some(self.old_name.to_pending()),
-            "new_name" => ::core::prelude::v1::Some(self.new_name.to_pending()),
-            _ => ::core::prelude::v1::None,
+            "old_name" => Some(self.old_name.reference()),
+            "new_name" => Some(self.new_name.reference()),
+            _ => None,
         }
-    }
-
-    fn to_common(&self) -> ::core::prelude::v1::Option<::anathema::state::CommonVal<'_>> {
-        Some(CommonVal::Str(&self.common))
     }
 }

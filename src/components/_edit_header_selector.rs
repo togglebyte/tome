@@ -43,8 +43,8 @@ impl DashboardMessageHandler for EditHeaderSelector {
         value: anathema::state::CommonVal<'_>,
         ident: impl Into<String>,
         state: &mut super::dashboard::DashboardState,
-        mut context: anathema::prelude::Context<'_, super::dashboard::DashboardState>,
-        _: Elements<'_, '_>,
+        mut context: anathema::prelude::Context<'_, '_, super::dashboard::DashboardState>,
+        _: anathema::component::Children,
         component_ids: std::cell::Ref<'_, HashMap<String, component::ComponentId<String>>>,
     ) {
         let event: String = ident.into();
@@ -52,7 +52,7 @@ impl DashboardMessageHandler for EditHeaderSelector {
         match event.as_str() {
             "edit_header_selector__cancel" => {
                 state.floating_window.set(FloatingWindow::None);
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
             }
 
             "edit_header_selector__selection" => {
@@ -91,8 +91,7 @@ impl DashboardMessageHandler for EditHeaderSelector {
                 let edit_header_name_input_id = component_ids.get("edit_header_name_input");
                 if let Some(id) = edit_header_name_input_id {
                     context.emit(*id, state.edit_header_name.to_ref().clone());
-
-                    context.set_focus("id", "edit_header_window");
+                    context.components.by_name("edit_header_window").focus();
 
                     let _ = send_message(
                         "edit_header_window",
@@ -124,8 +123,8 @@ impl Component for EditHeaderSelector {
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         self.update_app_theme(state);
     }
@@ -134,8 +133,8 @@ impl Component for EditHeaderSelector {
         &mut self,
         event: component::KeyEvent,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match event.code {
             component::KeyCode::Char(char) => {

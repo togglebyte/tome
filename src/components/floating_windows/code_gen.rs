@@ -6,10 +6,8 @@ use std::{
 
 use anathema::{
     component::{self, Component, ComponentId, Emitter},
-    prelude::TuiBackend,
-    runtime::RuntimeBuilder,
-    state::{State, Value},
-    widgets::Elements,
+    runtime::Builder,
+    state::{AnyState, State, Value},
 };
 
 use crate::{
@@ -32,14 +30,14 @@ pub struct CodeGen {
 impl CodeGen {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
     ) -> anyhow::Result<()> {
         let mut languages = HashMap::<char, String>::new();
         languages.insert('r', String::from("rust"));
         languages.insert('t', String::from("typescript"));
         languages.insert('j', String::from("javascript"));
 
-        let app_id = builder.register_component(
+        let app_id = builder.component(
             "codegen_window",
             template("floating_windows/templates/code_gen"),
             CodeGen { languages },
@@ -114,8 +112,8 @@ impl Component for CodeGen {
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         self.update_app_theme(state);
     }
@@ -124,8 +122,8 @@ impl Component for CodeGen {
         &mut self,
         key: anathema::component::KeyEvent,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match key.code {
             anathema::component::KeyCode::Char(char) => {
@@ -133,11 +131,11 @@ impl Component for CodeGen {
                 let language = self.languages.get(&char).unwrap_or(&default_language);
                 state.language.set(language.clone());
 
-                context.publish("codegen__selection", |state| &state.language);
+                context.publish("codegen__selection");
             }
 
             anathema::component::KeyCode::Esc => {
-                context.publish("codegen__cancel", |state| &state.language);
+                context.publish("codegen__cancel");
             }
 
             _ => {}
@@ -147,20 +145,20 @@ impl Component for CodeGen {
 
 impl DashboardMessageHandler for CodeGen {
     fn handle_message(
-        value: component::CommonVal<'_>,
+        value: &dyn AnyState,
         ident: impl Into<String>,
         state: &mut DashboardState,
-        mut context: anathema::prelude::Context<'_, DashboardState>,
-        _: Elements<'_, '_>,
+        mut context: anathema::prelude::Context<'_, '_, DashboardState>,
+        _: anathema::component::Children,
         component_ids: Ref<'_, HashMap<String, ComponentId<String>>>,
     ) {
         let event: String = ident.into();
         match event.as_str() {
             #[allow(clippy::single_match)]
-            "codegen__selection" => match value.to_string().as_str() {
+            "codegen__selection" => match value.as_str().unwrap() {
                 "rust" => {
                     state.floating_window.set(FloatingWindow::None);
-                    context.set_focus("id", "app");
+                    context.components.by_name("app").focus();
 
                     let project = state.project.to_ref();
                     match generate_rust((&*project).into()) {
@@ -192,7 +190,7 @@ impl DashboardMessageHandler for CodeGen {
                     };
 
                     state.floating_window.set(FloatingWindow::None);
-                    context.set_focus("id", "app");
+                    context.components.by_name("app").focus();
 
                     let project = state.project.to_ref();
 
@@ -220,7 +218,7 @@ impl DashboardMessageHandler for CodeGen {
 
             "codegen__cancel" => {
                 state.floating_window.set(FloatingWindow::None);
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
             }
 
             _ => {}

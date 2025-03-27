@@ -2,9 +2,8 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use anathema::{
     component::{Component, ComponentId, Emitter, KeyCode},
-    prelude::{Context, ToSourceKind, TuiBackend},
-    runtime::RuntimeBuilder,
-    widgets::Elements,
+    prelude::{Context, ToSourceKind},
+    runtime::Builder,
 };
 
 use crate::theme::{get_app_theme, AppTheme};
@@ -28,7 +27,7 @@ pub struct EditInput {
 impl EditInput {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
         ident: impl Into<String>,
         template: impl ToSourceKind,
         input_for: Option<String>,
@@ -41,7 +40,7 @@ impl EditInput {
             &app_theme.background.to_ref(),
         );
 
-        let app_id = builder.register_component(
+        let app_id = builder.component(
             name.clone(),
             template,
             EditInput {
@@ -130,8 +129,8 @@ impl Component for EditInput {
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        elements: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        elements: anathema::component::Children,
+        context: Context<'_, '_, Self::State>,
     ) {
         self._on_focus(state, elements, context);
     }
@@ -139,8 +138,8 @@ impl Component for EditInput {
     fn on_blur(
         &mut self,
         state: &mut Self::State,
-        elements: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        elements: anathema::component::Children,
+        context: Context<'_, '_, Self::State>,
     ) {
         self._on_blur(state, elements, context);
     }
@@ -149,8 +148,8 @@ impl Component for EditInput {
         &mut self,
         key: anathema::component::KeyEvent,
         state: &mut Self::State,
-        elements: Elements<'_, '_>,
-        mut context: Context<'_, Self::State>,
+        elements: anathema::component::Children,
+        mut context: Context<'_, '_, Self::State>,
     ) {
         self._on_key(&key, state, &elements, &mut context);
 
@@ -162,8 +161,8 @@ impl Component for EditInput {
         &mut self,
         message: Self::Message,
         state: &mut Self::State,
-        elements: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        elements: anathema::component::Children,
+        context: Context<'_, '_, Self::State>,
     ) {
         let emitter = context.emitter.clone();
         self._message(message, state, elements, context);

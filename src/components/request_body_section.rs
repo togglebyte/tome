@@ -1,13 +1,29 @@
 use anathema::{
     component::Component,
-    state::{CommonVal, State},
+    state::{AnyState, State},
 };
 
 #[derive(Default)]
 pub struct RequestBodySection;
 
-#[derive(Default, State)]
+#[derive(Default)]
 pub struct RequestBodySectionState {}
+
+impl anathema::state::TypeId for RequestBodySectionState {
+    const TYPE: anathema::state::Type = anathema::state::Type::Composite;
+}
+impl anathema::state::State for RequestBodySectionState {
+    fn type_info(&self) -> anathema::state::Type {
+        anathema::state::Type::Composite
+    }
+}
+impl anathema::state::AnyMap for RequestBodySectionState {
+    fn lookup(&self, key: &str) -> Option<anathema::state::PendingValue> {
+        match key {
+            _ => None,
+        }
+    }
+}
 
 impl Component for RequestBodySection {
     type State = RequestBodySectionState;
@@ -20,30 +36,31 @@ impl Component for RequestBodySection {
     fn receive(
         &mut self,
         ident: &str,
-        value: anathema::state::CommonVal<'_>,
+        value: &dyn AnyState,
         _state: &mut Self::State,
-        mut elements: anathema::widgets::Elements<'_, '_>,
-        context: anathema::prelude::Context<'_, Self::State>,
+        mut elements: anathema::component::Children,
+        context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         if let "request_body_border" = ident {
-            let focus = value.to_bool();
+            let &focus = value.to::<bool>();
             if focus {
                 return;
             }
 
-            let Some(border_color) = context.get_external("border_color") else {
+            let Some(border_color) = context.attribute("border_color") else {
                 return;
             };
-            let Some(border_color) = border_color.to_common() else {
+            let Some(color) = border_color.as_str() else {
                 return;
             };
 
-            // NOTE: Is this right?
-            let color = border_color.to_string().leak();
+            let color = color.to_string().leak();
+
             elements
+                .elements()
                 .by_attribute("id", "request_body_border")
                 .each(|_element, attributes| {
-                    attributes.set("foreground", CommonVal::Str(color));
+                    attributes.set("foreground", &*color);
                 });
         }
     }

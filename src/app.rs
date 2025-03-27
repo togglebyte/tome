@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, fs::File, rc::Rc};
 use anathema::{
     component::ComponentId,
     prelude::{Document, ToSourceKind, TuiBackend},
-    runtime::{Runtime, RuntimeBuilder},
+    runtime::{Builder, Runtime},
 };
 use log::{info, LevelFilter};
 use simplelog::{Config, WriteLogger};
@@ -104,34 +104,33 @@ impl App {
             eprintln!("{error:?}");
         }
 
-        let backend = tui.unwrap();
-        let mut runtime_builder = Runtime::builder(doc, backend);
+        let mut backend = tui.unwrap();
+        let mut runtime_builder = Runtime::builder(doc, &backend);
 
         info!("Registering components...");
         self.register_components(&mut runtime_builder)?;
 
-        let runtime = runtime_builder.finish();
         info!("Started runtime...");
-
-        if let Ok(mut runtime) = runtime {
-            let _emitter = runtime.emitter();
-
-            info!("Running runtime...");
-            runtime.run();
-        } else if let Err(error) = runtime {
+        if let Err(error) = runtime_builder.finish(|rt| rt.run(&mut backend)) {
             eprintln!("{:?}", error);
         }
+
+        // if let Ok(mut runtime) = runtime {
+        //     let _emitter = runtime.emitter();
+
+        //     info!("Running runtime...");
+        //     runtime.run();
+        // } else if let Err(error) = runtime {
+        //     eprintln!("{:?}", error);
+        // }
 
         Ok(())
     }
 
-    fn register_prototypes(
-        &self,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
-    ) -> anyhow::Result<()> {
+    fn register_prototypes(&self, builder: &mut Builder<()>) -> anyhow::Result<()> {
         let mut component_ids = self.component_ids.clone();
 
-        builder.register_prototype(
+        builder.prototype(
             "textinput",
             TEXTINPUT_TEMPLATE.to_template(),
             move || TextInput {
@@ -143,7 +142,7 @@ impl App {
 
         component_ids = self.component_ids.clone();
 
-        builder.register_prototype(
+        builder.prototype(
             "response_body_area",
             template("templates/textarea"),
             move || {
@@ -166,50 +165,47 @@ impl App {
             },
         )?;
 
-        builder.register_prototype(
+        builder.prototype(
             "method_selector",
             template("templates/method_selector"),
             || MethodSelector,
             MethodSelectorState::new,
         )?;
 
-        builder.register_prototype(
+        builder.prototype(
             "body_mode_selector",
             template("floating_windows/templates/body_mode_selector"),
             || BodyModeSelector,
             BodyModeSelectorState::new,
         )?;
 
-        builder.register_prototype(
+        builder.prototype(
             "menu_item",
             template("templates/menu_item"),
             || MenuItem,
             MenuItemState::new,
         )?;
 
-        builder.register_prototype(
+        builder.prototype(
             "request_headers_editor",
             template("templates/request_headers_editor"),
             || RequestHeadersEditor,
             RequestHeadersEditorState::new,
         )?;
 
-        builder.register_prototype(
+        builder.prototype(
             "app_section",
             template("templates/app_section"),
             || AppSection,
             AppSectionState::new,
         )?;
 
-        builder.register_prototype("row", template("templates/row"), || Row, RowState::new)?;
+        builder.prototype("row", template("templates/row"), || Row, RowState::new)?;
 
         Ok(())
     }
 
-    fn register_components(
-        &mut self,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
-    ) -> anyhow::Result<()> {
+    fn register_components(&mut self, builder: &mut Builder<()>) -> anyhow::Result<()> {
         self.register_prototypes(builder)?;
 
         AddHeaderWindow::register(&self.component_ids, builder)?;

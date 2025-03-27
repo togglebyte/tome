@@ -4,13 +4,13 @@ use crate::{
     theme::{get_app_theme_by_name, AppTheme},
 };
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, process::Child, rc::Rc};
 
 use anathema::{
     component::{Component, ComponentId},
-    prelude::{Context, TuiBackend},
-    runtime::RuntimeBuilder,
-    state::{CommonVal, State, Value},
+    prelude::Context,
+    runtime::Builder,
+    state::{AnyState, State, Value},
 };
 
 use crate::options::get_options;
@@ -70,11 +70,15 @@ enum OptionsWindows {
 }
 
 impl State for OptionsWindows {
-    fn to_common(&self) -> Option<CommonVal<'_>> {
+    fn type_info(&self) -> anathema::state::Type {
+        anathema::state::Type::String
+    }
+
+    fn as_str(&self) -> Option<&str> {
         match self {
-            OptionsWindows::SyntaxThemeSelector => Some(CommonVal::Str("SyntaxThemeSelector")),
-            OptionsWindows::AppThemeSelector => Some(CommonVal::Str("AppThemeSelector")),
-            OptionsWindows::None => Some(CommonVal::Str("None")),
+            Self::None => Some("None"),
+            Self::SyntaxThemeSelector => Some("SyntaxThemeSelector"),
+            Self::AppThemeSelector => Some("AppThemeSelector"),
         }
     }
 }
@@ -86,10 +90,10 @@ impl OptionsView {
 
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
     ) -> anyhow::Result<()> {
         let options = get_options();
-        let id = builder.register_component(
+        let id = builder.component(
             "options",
             template("templates/options"),
             OptionsView::new(ids.clone()),
@@ -102,7 +106,7 @@ impl OptionsView {
         Ok(())
     }
 
-    fn go_back(&self, context: anathema::prelude::Context<'_, OptionsViewState>) {
+    fn go_back(&self, context: anathema::prelude::Context<'_, '_, OptionsViewState>) {
         let component_ids = self.component_ids.try_borrow();
         if component_ids.is_err() {
             return;
@@ -123,29 +127,29 @@ impl OptionsView {
     fn open_theme_selector(
         &self,
         state: &mut OptionsViewState,
-        mut context: anathema::prelude::Context<'_, OptionsViewState>,
+        mut context: anathema::prelude::Context<'_, '_, OptionsViewState>,
     ) {
         state
             .options_window
             .set(OptionsWindows::SyntaxThemeSelector);
-
-        context.set_focus("id", "syntax_theme_selector");
+        context.components.by_name("syntax_theme_selector").focus();
+        context.components.by_name("syntax_theme_selector").focus();
     }
 
     fn open_app_theme_selector(
         &self,
         state: &mut OptionsViewState,
-        mut context: anathema::prelude::Context<'_, OptionsViewState>,
+        mut context: anathema::prelude::Context<'_, '_, OptionsViewState>,
     ) {
         state.options_window.set(OptionsWindows::AppThemeSelector);
-
-        context.set_focus("id", "app_theme_selector");
+        context.components.by_name("app_theme_selector").focus();
+        context.components.by_name("app_theme_selector").focus();
     }
 
     fn update_app_theme(
         &self,
         state: &mut OptionsViewState,
-        context: Context<'_, OptionsViewState>,
+        context: Context<'_, '_, OptionsViewState>,
     ) {
         let app_theme_name = state.options.to_ref().app_theme_name.to_ref().clone();
         let app_theme = get_app_theme_by_name(&app_theme_name);
@@ -185,7 +189,7 @@ impl OptionsView {
         });
     }
 
-    fn send_error_message(&self, error_message: &str, context: Context<'_, OptionsViewState>) {
+    fn send_error_message(&self, error_message: &str, context: Context<'_, '_, OptionsViewState>) {
         let dashboard_msg = DashboardMessages::ShowError(error_message.to_string());
         let Ok(msg) = serde_json::to_string(&dashboard_msg) else {
             return;
@@ -209,8 +213,8 @@ impl Component for OptionsView {
         &mut self,
         key: anathema::component::KeyEvent,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        context: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match key.code {
             #[allow(clippy::single_match)]
@@ -230,16 +234,16 @@ impl Component for OptionsView {
     fn receive(
         &mut self,
         ident: &str,
-        value: CommonVal<'_>,
+        value: &dyn AnyState,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        children: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match ident {
             "syntax_theme_selector__selection" => {
                 let mut options = get_options();
 
-                let new_theme = value.to_string().replace(".tmTheme", "");
+                let new_theme = value.as_str().unwrap().replace(".tmTheme", "");
                 options.syntax_theme = new_theme.clone();
 
                 match save_options(options) {
@@ -256,22 +260,24 @@ impl Component for OptionsView {
             }
             "syntax_theme_selector__cancel" => {
                 state.options_window.set(OptionsWindows::None);
-                context.set_focus("id", "options");
+
+                context.components.by_name("options").focus();
             }
 
             "app_theme_selector__cancel" => {
                 state.options_window.set(OptionsWindows::None);
-                context.set_focus("id", "options");
+                context.components.by_name("options").focus();
             }
 
             "app_theme_selector__selection" => {
                 let mut options = get_options();
 
-                options.app_theme_name = value.to_string();
+                let name = value.as_str().unwrap();
+                options.app_theme_name = name.to_string();
 
                 match save_options(options) {
                     Ok(_) => {
-                        state.options.to_mut().app_theme_name.set(value.to_string());
+                        state.options.to_mut().app_theme_name.set(name.to_string());
                         self.update_app_theme(state, context);
                     }
                     Err(error) => {

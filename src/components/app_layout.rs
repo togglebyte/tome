@@ -2,10 +2,9 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use anathema::{
     component::ComponentId,
-    prelude::{Context, TuiBackend},
-    runtime::RuntimeBuilder,
-    state::{CommonVal, State, Value},
-    widgets::Elements,
+    prelude::Context,
+    runtime::Builder,
+    state::{AnyMap, State, Value},
 };
 use serde::{Deserialize, Serialize};
 
@@ -23,10 +22,14 @@ enum AppDisplay {
 }
 
 impl State for AppDisplay {
-    fn to_common(&self) -> Option<anathema::state::CommonVal<'_>> {
+    fn type_info(&self) -> anathema::state::Type {
+        anathema::state::Type::String
+    }
+
+    fn as_str(&self) -> Option<&str> {
         match self {
-            AppDisplay::Dashboard => Some(CommonVal::Str("Dashboard")),
-            AppDisplay::Options => Some(CommonVal::Str("Options")),
+            AppDisplay::Dashboard => Some("Dashboard"),
+            AppDisplay::Options => Some("Options"),
         }
     }
 }
@@ -44,9 +47,9 @@ pub struct AppLayoutComponent {
 impl AppLayoutComponent {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
     ) -> anyhow::Result<()> {
-        let app_id = builder.register_component(
+        let app_id = builder.component(
             "app",
             template("templates/app_layout"),
             AppLayoutComponent {
@@ -71,18 +74,18 @@ impl anathema::component::Component for AppLayoutComponent {
     fn on_focus(
         &mut self,
         _state: &mut Self::State,
-        mut _elements: Elements<'_, '_>,
-        mut context: Context<'_, Self::State>,
+        mut _elements: anathema::component::Children,
+        mut context: Context<'_, '_, Self::State>,
     ) {
-        context.set_focus("id", "app");
+        context.components.by_name("app").focus();
     }
 
     fn message(
         &mut self,
         message: Self::Message,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        mut context: Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: Context<'_, '_, Self::State>,
     ) {
         let Ok(app_layout_message) = serde_json::from_str::<AppLayoutMessages>(&message) else {
             return;
@@ -91,12 +94,12 @@ impl anathema::component::Component for AppLayoutComponent {
         match app_layout_message {
             AppLayoutMessages::OpenOptions => {
                 state.display.set(AppDisplay::Options);
-                context.set_focus("id", "options");
+                context.components.by_name("options").focus();
             }
 
             AppLayoutMessages::OpenDashboard => {
                 state.display.set(AppDisplay::Dashboard);
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
             }
         }
     }

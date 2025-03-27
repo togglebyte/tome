@@ -45,7 +45,7 @@ pub fn get_documents_dir() -> anyhow::Result<PathBuf> {
 pub fn save_response(
     dashboard: &DashboardComponent,
     state: &mut DashboardState,
-    _: Context<'_, DashboardState>,
+    _: Context<'_, '_, DashboardState>,
 ) {
     let dir = get_documents_dir();
 

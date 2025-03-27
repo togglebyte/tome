@@ -1,6 +1,6 @@
 use anathema::{
     component::Component,
-    state::{CommonVal, State, Value},
+    state::{AnyState, State, Value},
 };
 
 use crate::theme::{get_app_theme, AppTheme};
@@ -43,27 +43,25 @@ impl Component for AppSection {
     fn tick(
         &mut self,
         state: &mut Self::State,
-        elements: anathema::widgets::Elements<'_, '_>,
-        context: anathema::prelude::Context<'_, Self::State>,
+        elements: anathema::component::Children,
+        context: anathema::prelude::Context<'_, '_, Self::State>,
         _dt: std::time::Duration,
     ) {
         if state.section_id.to_ref().is_none() {
-            let Some(section_id) = context.get_external("section_id") else {
+            let Some(section_id) = context.attribute("section_id") else {
                 return;
             };
 
-            let Some(section_text_id) = context.get_external("section_text_id") else {
+            let Some(section_text_id) = context.attribute("section_text_id") else {
                 return;
             };
 
-            if let Some(id) = section_id.to_common() {
-                let id = id.to_string();
-                state.section_id.set(Some(id));
+            if let Some(id) = section_id.as_str() {
+                state.section_id.set(Some(id.to_string()));
             }
 
-            if let Some(section_text_id) = section_text_id.to_common() {
-                let text_id = section_text_id.to_string();
-                state.section_text_id.set(Some(text_id));
+            if let Some(section_text_id) = section_text_id.as_str() {
+                state.section_text_id.set(Some(section_text_id.to_string()));
             }
         }
 
@@ -73,32 +71,31 @@ impl Component for AppSection {
     fn receive(
         &mut self,
         ident: &str,
-        value: CommonVal<'_>,
+        value: &dyn AnyState,
         state: &mut Self::State,
-        mut elements: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        mut elements: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         if ident == "input_focus" {
-            let focus = value.to_bool();
+            let &focus = value.to::<bool>();
             if !focus {
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
             }
 
             let section_id = state.section_id.to_ref().clone();
             let Some(section_id) = section_id else { return };
-            let section_id = section_id.to_string().leak();
 
             match focus {
-                true => elements
-                    .by_attribute("id", CommonVal::Str(section_id))
-                    .each(|_element, attributes| {
+                true => elements.elements().by_attribute("id", &*section_id).each(
+                    |_element, attributes| {
                         attributes.set("foreground", "#ffff00");
-                    }),
-                false => elements
-                    .by_attribute("id", CommonVal::Str(section_id))
-                    .each(|_element, attributes| {
+                    },
+                ),
+                false => elements.elements().by_attribute("id", &*section_id).each(
+                    |_element, attributes| {
                         attributes.set("foreground", "#ff0000");
-                    }),
+                    },
+                ),
             }
         }
     }

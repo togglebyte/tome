@@ -11,10 +11,9 @@ use anathema::{
     component::{Component, ComponentId},
     default_widgets::Overflow,
     geometry::{Pos, Size},
-    prelude::{Context, TuiBackend},
-    runtime::RuntimeBuilder,
-    state::{Hex, List, State, Value},
-    widgets::Elements,
+    prelude::Context,
+    runtime::Builder,
+    state::{AnyState, Hex, List, State, Value},
 };
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -59,7 +58,7 @@ pub struct ResponseRenderer {
 impl ResponseRenderer {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
         ident: String,
     ) -> anyhow::Result<()> {
         let template = if ident == "response_renderer" {
@@ -68,7 +67,7 @@ impl ResponseRenderer {
             template("templates/syntax_highlighter_renderer")
         };
 
-        let id = builder.register_component(
+        let id = builder.component(
             ident.clone(),
             template,
             ResponseRenderer::new(ids.clone()),
@@ -148,10 +147,10 @@ impl ResponseRenderer {
     fn render_response(
         &mut self,
         extension: String,
-        elements: &mut Elements<'_, '_>,
+        elements: &mut anathema::component::Children,
         state: &mut ResponseRendererState,
         offset: usize,
-        context: Context<'_, ResponseRendererState>,
+        context: Context<'_, '_, ResponseRendererState>,
     ) {
         if self.response_reader.is_none() {
             return;
@@ -166,7 +165,7 @@ impl ResponseRenderer {
         let size = self.size.unwrap();
         let response_reader = self.response_reader.as_mut().unwrap();
         self.response_offset = offset;
-        self.viewport_height = size.height;
+        self.viewport_height = size.height as usize;
 
         let mut buf: Vec<u8> = vec![];
         match response_reader.read_to_end(&mut buf) {
@@ -187,7 +186,11 @@ impl ResponseRenderer {
         self.scroll_response(elements, state, offset);
     }
 
-    fn send_error_message(&self, error_message: &str, context: Context<'_, ResponseRendererState>) {
+    fn send_error_message(
+        &self,
+        error_message: &str,
+        context: Context<'_, '_, ResponseRendererState>,
+    ) {
         let dashboard_msg = DashboardMessages::ShowError(error_message.to_string());
         let Ok(msg) = serde_json::to_string(&dashboard_msg) else {
             return;
@@ -200,7 +203,7 @@ impl ResponseRenderer {
 
     fn scroll_response(
         &mut self,
-        _elements: &mut Elements<'_, '_>,
+        _elements: &mut anathema::component::Children,
         state: &mut ResponseRendererState,
         offset: usize,
     ) {
@@ -216,7 +219,7 @@ impl ResponseRenderer {
 
         let size = self.size.unwrap();
         self.response_offset = offset;
-        self.viewport_height = size.height;
+        self.viewport_height = size.height as usize;
 
         let mut viewable_lines: Vec<String> = vec![];
 
@@ -235,8 +238,8 @@ impl ResponseRenderer {
             let line = &self.response_lines[index];
             info!("Rendering line: {line}");
 
-            if line.len() > size.width {
-                let (new_line, _) = line.split_at(size.width.saturating_sub(5));
+            if line.len() > size.width as usize {
+                let (new_line, _) = line.split_at(size.width.saturating_sub(5) as usize);
 
                 let t = format!("{new_line}...");
 
@@ -297,7 +300,7 @@ impl ResponseRenderer {
 
         highlighted_lines.iter().for_each(|hl| {
             let mut line: Line = Line {
-                spans: List::empty(),
+                spans: List::empty().into(),
             };
 
             let head_src = hl.head.src.replace("\n", "");
@@ -350,10 +353,11 @@ impl ResponseRenderer {
 
     fn update_size(
         &mut self,
-        context: Context<'_, ResponseRendererState>,
-        elements: &mut Elements<'_, '_>,
+        context: Context<'_, '_, ResponseRendererState>,
+        elements: &mut anathema::component::Children,
     ) {
         elements
+            .elements()
             .by_attribute("id", "response_border")
             .first(|element, _| {
                 info!("{:?}", element.size());
@@ -376,8 +380,8 @@ impl ResponseRenderer {
     fn scroll(
         &mut self,
         state: &mut ResponseRendererState,
-        mut elements: Elements<'_, '_>,
-        context: Context<'_, ResponseRendererState>,
+        mut elements: anathema::component::Children,
+        context: Context<'_, '_, ResponseRendererState>,
         direction: ScrollDirection,
     ) {
         info!("scroll() direction: {direction:?}");
@@ -401,8 +405,8 @@ impl ResponseRenderer {
         &mut self,
         filter: String,
         state: &mut ResponseRendererState,
-        context: Context<'_, ResponseRendererState>,
-        elements: Elements<'_, '_>,
+        context: Context<'_, '_, ResponseRendererState>,
+        elements: anathema::component::Children,
     ) {
         info!("apply_response_filter");
         loop {
@@ -457,8 +461,8 @@ impl ResponseRenderer {
     fn do_filter(
         &mut self,
         state: &mut ResponseRendererState,
-        elements: Elements<'_, '_>,
-        context: Context<'_, ResponseRendererState>,
+        elements: anathema::component::Children,
+        context: Context<'_, '_, ResponseRendererState>,
     ) {
         // Go to the first search match
         let default_index = 0;
@@ -468,7 +472,7 @@ impl ResponseRenderer {
 
         if let Some(size) = self.size {
             let rows = size.height;
-            let range_end = (self.response_offset + rows).saturating_sub(1);
+            let range_end = (self.response_offset + rows as usize).saturating_sub(1);
             let match_range = (self.response_offset, range_end);
 
             highlight_matches(
@@ -518,7 +522,7 @@ impl Line {
 
     pub fn empty() -> Self {
         Self {
-            spans: List::empty(),
+            spans: List::empty().into(),
         }
     }
 }
@@ -570,7 +574,7 @@ impl ResponseRendererState {
             screen_cursor_y: 0.into(),
             buf_cursor_x: 0.into(),
             buf_cursor_y: 0.into(),
-            lines: List::from_iter(vec![Line::empty()]),
+            lines: List::from_iter(vec![Line::empty()]).into(),
             current_instruction: None.into(),
             title: "".to_string().into(),
             waiting: false.to_string().into(),
@@ -579,7 +583,7 @@ impl ResponseRendererState {
             percent_scrolled: "0".to_string().into(),
             app_theme: app_theme.into(),
             filter: "".to_string().into(),
-            filter_indexes: List::from_iter(vec![]),
+            filter_indexes: List::from_iter(vec![]).into(),
             filter_total: 0.into(),
             filter_nav_index: 0.into(),
         }
@@ -597,20 +601,21 @@ impl Component for ResponseRenderer {
     fn receive(
         &mut self,
         ident: &str,
-        value: anathema::state::CommonVal<'_>,
+        value: &dyn AnyState,
         state: &mut Self::State,
-        elements: Elements<'_, '_>,
-        mut context: Context<'_, Self::State>,
+        elements: anathema::component::Children,
+        mut context: Context<'_, '_, Self::State>,
     ) {
         match ident {
             "response_filter__input_update" => {
                 info!("response_filter__input_update");
-                state.filter.set(value.to_string());
-                self.apply_response_filter(value.to_string(), state, context, elements);
+                let filter = value.as_str().unwrap();
+                state.filter.set(filter.to_string());
+                self.apply_response_filter(filter.to_string(), state, context, elements);
             }
 
             "response_filter__input_escape" => {
-                context.set_focus("id", "response_renderer");
+                context.components.by_name("response_renderer").focus();
                 info!("Set focus back to response_renderer");
             }
 
@@ -621,22 +626,27 @@ impl Component for ResponseRenderer {
     fn on_focus(
         &mut self,
         _: &mut Self::State,
-        mut elements: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        mut elements: anathema::component::Children,
+        context: Context<'_, '_, Self::State>,
     ) {
         self.update_size(context, &mut elements);
         info!("response_renderer has focus");
     }
 
-    fn on_blur(&mut self, _: &mut Self::State, _: Elements<'_, '_>, _: Context<'_, Self::State>) {
+    fn on_blur(
+        &mut self,
+        _: &mut Self::State,
+        _: anathema::component::Children,
+        _: Context<'_, '_, Self::State>,
+    ) {
         info!("response_renderer lost focus");
     }
 
     fn resize(
         &mut self,
         _: &mut Self::State,
-        mut elements: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        mut elements: anathema::component::Children,
+        context: Context<'_, '_, Self::State>,
     ) {
         self.update_size(context, &mut elements);
 
@@ -649,13 +659,13 @@ impl Component for ResponseRenderer {
         &mut self,
         event: anathema::component::KeyEvent,
         state: &mut Self::State,
-        elements: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        elements: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         #[allow(clippy::single_match)]
         match event.code {
             anathema::component::KeyCode::Esc => {
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
                 info!("Set focus back to app");
             }
 
@@ -703,7 +713,7 @@ impl Component for ResponseRenderer {
 
                     false => match char {
                         'f' => {
-                            context.set_focus("id", "response_body_input");
+                            context.components.by_name("response_body_input").focus();
                             info!("Set focus to response_body_input");
 
                             if !state.filter.to_ref().is_empty() {
@@ -725,8 +735,8 @@ impl Component for ResponseRenderer {
         &mut self,
         message: Self::Message,
         state: &mut Self::State,
-        mut elements: anathema::widgets::Elements<'_, '_>,
-        context: anathema::prelude::Context<'_, Self::State>,
+        mut elements: anathema::component::Children,
+        context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         let response_renderer_message = serde_json::from_str::<ResponseRendererMessages>(&message);
 
@@ -873,11 +883,12 @@ fn highlight_matches(
 
 fn scroll_to_line(
     state: &mut ResponseRendererState,
-    mut elements: Elements<'_, '_>,
-    _: Context<'_, ResponseRendererState>,
+    mut elements: anathema::component::Children,
+    _: Context<'_, '_, ResponseRendererState>,
     line: usize,
 ) {
     elements
+        .elements()
         .by_attribute("id", "container")
         .each(|el, _attributes| {
             let overflow = el.to::<Overflow>();

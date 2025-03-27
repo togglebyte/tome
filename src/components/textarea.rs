@@ -5,17 +5,14 @@ use std::rc::Rc;
 use std::{io::Write, str::Chars};
 
 use anathema::component::{ComponentId, Emitter, KeyCode};
-use anathema::prelude::{ToSourceKind, TuiBackend};
-use anathema::runtime::RuntimeBuilder;
+use anathema::prelude::ToSourceKind;
+use anathema::runtime::Builder;
 use anathema::{
     default_widgets::{Overflow, Text},
     geometry::Pos,
     prelude::Context,
     state::{Number, State, Value},
-    widgets::{
-        layout::text::{Line, Segment},
-        Elements,
-    },
+    widgets::layout::text::{Line, Segment},
 };
 use arboard::Clipboard;
 use serde::{Deserialize, Serialize};
@@ -102,8 +99,8 @@ enum ScrollDirection {
 // NOTE: keep around for future, maybe
 // fn scroll_to_line(
 //     state: &mut TextAreaInputState,
-//     mut elements: Elements<'_, '_>,
-//     _: Context<'_, TextAreaInputState>,
+//     mut elements: anathema::component::Children,
+//     _: Context<'_, '_, TextAreaInputState>,
 //     line: usize,
 // ) {
 //     elements
@@ -124,11 +121,12 @@ enum ScrollDirection {
 
 fn scroll(
     state: &mut TextAreaInputState,
-    mut elements: Elements<'_, '_>,
-    context: Context<'_, TextAreaInputState>,
+    mut elements: anathema::component::Children,
+    context: Context<'_, '_, TextAreaInputState>,
     direction: ScrollDirection,
 ) {
     elements
+        .elements()
         .by_attribute("id", "container")
         .each(|el, _attributes| {
             let overflow = el.to::<Overflow>();
@@ -136,8 +134,8 @@ fn scroll(
             let scroll_amount = context.viewport.size().height / 2;
             let scroll_position = *state.scroll_position.to_ref();
             let new_scroll_position = match direction {
-                ScrollDirection::Up => scroll_position.saturating_sub(scroll_amount),
-                ScrollDirection::Down => scroll_position + scroll_amount,
+                ScrollDirection::Up => scroll_position.saturating_sub(scroll_amount as usize),
+                ScrollDirection::Down => scroll_position + scroll_amount as usize,
             };
 
             state.scroll_position.set(new_scroll_position);
@@ -163,8 +161,8 @@ impl anathema::component::Component for TextArea {
         &mut self,
         message: Self::Message,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        _: Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: Context<'_, '_, Self::State>,
     ) {
         if let Ok(deserialized_msg) = serde_json::from_str::<TextAreaMessages>(&message) {
             #[allow(clippy::single_match)]
@@ -181,35 +179,35 @@ impl anathema::component::Component for TextArea {
     fn resize(
         &mut self,
         state: &mut Self::State,
-        _elements: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        _elements: anathema::component::Children,
+        context: Context<'_, '_, Self::State>,
     ) {
-        if let Some(color) = context.get_external("color") {
-            state.text_color.set(color.to_common().unwrap().to_string());
+        if let Some(color) = context.attribute("color") {
+            state.text_color.set(color.as_str().unwrap().to_string());
         };
     }
 
     fn tick(
         &mut self,
         state: &mut Self::State,
-        mut _elements: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        mut _elements: anathema::component::Children,
+        context: Context<'_, '_, Self::State>,
         _dt: std::time::Duration,
     ) {
-        if let Some(output) = context.get_external("output") {
-            state.input.set(output.to_common().unwrap().to_string());
+        if let Some(output) = context.attribute("output") {
+            state.input.set(output.as_str().unwrap().to_string());
         };
 
-        if let Some(color) = context.get_external("color") {
-            state.text_color.set(color.to_common().unwrap().to_string());
+        if let Some(color) = context.attribute("color") {
+            state.text_color.set(color.as_str().unwrap().to_string());
         };
     }
 
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        mut context: Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: Context<'_, '_, Self::State>,
     ) {
         state
             .fg_color
@@ -219,14 +217,14 @@ impl anathema::component::Component for TextArea {
             .set(state.cursor_selected_bg.to_ref().to_string());
         state.focused.set(true);
 
-        context.publish("textarea_focus", |state| &state.focused);
+        context.publish("textarea_focus");
     }
 
     fn on_blur(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        mut context: Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: Context<'_, '_, Self::State>,
     ) {
         state.cursor_char.set("".to_string());
         state
@@ -237,16 +235,17 @@ impl anathema::component::Component for TextArea {
             .set(state.cursor_unselected_bg.to_ref().to_string());
         state.focused.set(false);
 
-        context.publish("textarea_focus", |state| &state.focused);
-        context.set_focus("id", "app");
+        context.publish("textarea_focus");
+
+        context.components.by_name("app").focus();
     }
 
     fn on_key(
         &mut self,
         event: anathema::component::KeyEvent,
         state: &mut Self::State,
-        elements: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        elements: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match event.code {
             // NOTE: Unused for TextInput
@@ -312,9 +311,9 @@ impl anathema::component::Component for TextArea {
 
             // Move focus with this
             anathema::component::KeyCode::Esc => {
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
 
-                context.publish("textarea_focus", |state| &state.focused);
+                context.publish("textarea_focus");
             }
 
             _ => {}
@@ -379,7 +378,7 @@ pub enum TextAreaMessages {
 impl TextArea {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
         ident: String,
         tpl: impl ToSourceKind,
         input_for: Option<String>,
@@ -393,7 +392,7 @@ impl TextArea {
             &app_theme.background.to_ref(),
         );
 
-        let app_id = builder.register_component(
+        let app_id = builder.component(
             name.clone(),
             tpl,
             TextArea {
@@ -436,19 +435,19 @@ impl TextArea {
         &mut self,
         char: char,
         state: &mut TextAreaInputState,
-        mut context: Context<'_, TextAreaInputState>,
-        mut elements: anathema::widgets::Elements<'_, '_>,
+        mut context: Context<'_, '_, TextAreaInputState>,
+        mut elements: anathema::component::Children,
         event: anathema::component::KeyEvent,
     ) {
         let mut input = state.input.to_mut();
 
-        elements
+        elements.elements()
             .by_attribute("id", "contents")
             .each(|el, _attributes| {
                 let text = el.to::<Text>();
-                let editable = context.get_external("editable");
+                let editable = context.attribute("editable");
                 if let Some(editable) = editable {
-                    let is_editable = editable.load_bool();
+                    let is_editable = editable.as_bool().unwrap();
                     if !is_editable {
                         return;
                     }
@@ -469,23 +468,17 @@ impl TextArea {
                 let current_line_count = text.get_line_count();
                 let prev_line_count = state
                     .line_count
-                    .to_number()
-                    .unwrap_or(Number::Usize(0))
-                    .as_uint();
+                    .copy_value();
                 state.line_count.set(current_line_count);
 
                 // Get coordinates before this character input
                 let mut cursor_coordinates = state.cursor_position.to_mut();
                 let prev_cursor_x = cursor_coordinates
                     .x
-                    .to_number()
-                    .unwrap_or(Number::Usize(0))
-                    .as_uint();
+                    .copy_value();
                 let prev_cursor_y = cursor_coordinates
                     .y
-                    .to_number()
-                    .unwrap_or(Number::Usize(0))
-                    .as_uint();
+                    .copy_value();
 
                 log(format!("prev_x: {prev_cursor_x}\n"), None);
                 log(format!("prev_y: {prev_cursor_y}\n"), None);
@@ -567,21 +560,26 @@ impl TextArea {
             });
 
         elements
+            .elements()
             .by_attribute("id", "container")
             .each(|el, _attributes| {
                 let coordinates = state.cursor_position.to_ref();
-                let x = coordinates.x.to_number().unwrap_or(Number::I32(0)).as_int() as i32;
-                let y = coordinates.y.to_number().unwrap_or(Number::I32(0)).as_int() as i32;
+                let x = coordinates.x.copy_value() as i32;
+                let y = coordinates.y.copy_value() as i32;
 
                 let position = Pos { x, y };
                 let overflow = el.to::<Overflow>();
                 overflow.scroll_to(position);
             });
 
-        context.publish("text_change", |state| &state.input)
+        context.publish("text_change")
     }
 
-    fn delete(&self, _state: &mut TextAreaInputState, _context: Context<'_, TextAreaInputState>) {
+    fn delete(
+        &self,
+        _state: &mut TextAreaInputState,
+        _context: Context<'_, '_, TextAreaInputState>,
+    ) {
         // let mut input = state.input.to_mut();
         // let Some(cursor_position) = state.cursor_position.to_number() else {
         //     return;
@@ -605,16 +603,17 @@ impl TextArea {
         //     .cursor_prefix
         //     .set(input.chars().take(pos).collect::<String>());
         //
-        // context.publish("text_change", |state| &state.input)
+        // context.publish("text_change")
     }
 
     fn backspace(
         &mut self,
         state: &mut TextAreaInputState,
-        mut context: Context<'_, TextAreaInputState>,
-        mut elements: anathema::widgets::Elements<'_, '_>,
+        mut context: Context<'_, '_, TextAreaInputState>,
+        mut elements: anathema::component::Children,
     ) {
         elements
+            .elements()
             .by_attribute("id", "contents")
             .each(|el, _attributes| {
                 log(
@@ -654,7 +653,7 @@ impl TextArea {
                         Some("backspace.txt"),
                     );
                     input.remove(backspace_index);
-                    context.publish("text_change", |state| &state.input);
+                    context.publish("text_change");
 
                     // let mut prefix = state.cursor_prefix.to_mut();
                     // prefix.remove(backspace_index);
@@ -710,7 +709,7 @@ impl TextArea {
     fn move_cursor_left(
         &self,
         state: &mut TextAreaInputState,
-        mut elements: anathema::widgets::Elements<'_, '_>,
+        mut elements: anathema::component::Children,
     ) {
         // TODO: Refactor this so its not repeated when moving right
         let cursor_index = state.cursor_prefix.to_ref().len();
@@ -733,6 +732,7 @@ impl TextArea {
             coordinates.x.set(x - 1);
         } else {
             elements
+                .elements()
                 .by_attribute("id", "contents")
                 .each(|el, _attributes| {
                     let text = el.to::<Text>();
@@ -752,9 +752,10 @@ impl TextArea {
     fn move_cursor_right(
         &self,
         state: &mut TextAreaInputState,
-        mut elements: anathema::widgets::Elements<'_, '_>,
+        mut elements: anathema::component::Children,
     ) {
         elements
+            .elements()
             .by_attribute("id", "contents")
             .each(|el, _attributes| {
                 // TODO: Fix this clone
@@ -813,9 +814,10 @@ impl TextArea {
     fn move_cursor_up(
         &self,
         state: &mut TextAreaInputState,
-        mut elements: anathema::widgets::Elements<'_, '_>,
+        mut elements: anathema::component::Children,
     ) {
         elements
+            .elements()
             .by_attribute("id", "contents")
             .each(|el, _attributes| {
                 let text = el.to::<Text>();
@@ -826,9 +828,10 @@ impl TextArea {
     fn move_cursor_down(
         &self,
         state: &mut TextAreaInputState,
-        mut elements: anathema::widgets::Elements<'_, '_>,
+        mut elements: anathema::component::Children,
     ) {
         elements
+            .elements()
             .by_attribute("id", "contents")
             .each(|el, _attributes| {
                 let text = el.to::<Text>();

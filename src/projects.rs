@@ -38,14 +38,17 @@ pub enum ProjectVariableType {
 }
 
 impl State for ProjectVariableType {
-    fn to_common(&self) -> Option<state::CommonVal<'_>> {
-        match self {
-            ProjectVariableType::String => Some(state::CommonVal::Str("String")),
-            ProjectVariableType::Boolean => Some(state::CommonVal::Str("Boolean")),
-            ProjectVariableType::Any => Some(state::CommonVal::Str("Any")),
-            ProjectVariableType::Number => Some(state::CommonVal::Str("Number")),
-        }
+    fn type_info(&self) -> state::Type {
+        state::Type::String
     }
+    // fn to_common(&self) -> Option<&str> {
+    //     match self {
+    //         ProjectVariableType::String => Some("String"),
+    //         ProjectVariableType::Boolean => Some("Boolean"),
+    //         ProjectVariableType::Any => Some("Any"),
+    //         ProjectVariableType::Number => Some("Number"),
+    //     }
+    // }
 }
 
 #[derive(State, Default, Debug)]
@@ -92,8 +95,8 @@ impl Project {
             name: String::from(DEFAULT_PROJECT_NAME).into(),
             row_color: DEFAULT_ROW_COLOR.to_string().into(),
             row_fg_color: DEFAULT_ROW_COLOR.to_string().into(),
-            endpoints: List::empty(),
-            variable: List::empty(),
+            endpoints: List::empty().into(),
+            variable: List::empty().into(),
         }
     }
 }
@@ -120,7 +123,7 @@ impl Endpoint {
             body: String::from("").into(),
             body_mode: String::from("raw").into(),
             raw_type: String::from("text").into(),
-            headers: List::from_iter(get_default_headers()),
+            headers: List::from_iter(get_default_headers()).into(),
             row_color: DEFAULT_ROW_COLOR.to_string().into(),
             row_fg_color: DEFAULT_ROW_COLOR.to_string().into(),
         }
@@ -142,7 +145,7 @@ impl Endpoint {
             raw_type: self.raw_type.to_ref().to_string().into(),
             row_color: DEFAULT_ROW_COLOR.to_string().into(),
             row_fg_color: DEFAULT_ROW_COLOR.to_string().into(),
-            headers: List::from_iter(headers),
+            headers: List::from_iter(headers).into(),
         }
     }
 }
@@ -420,9 +423,9 @@ pub fn get_projects() -> anyhow::Result<Vec<PersistedProject>> {
 #[allow(unused)]
 pub fn get_project_list() -> anyhow::Result<Value<List<Project>>> {
     match get_projects() {
-        Ok(projects) => Ok(List::<Project>::from_iter(
-            projects.iter().map(|project| project.into()),
-        )),
+        Ok(projects) => {
+            Ok(List::<Project>::from_iter(projects.iter().map(|project| project.into())).into())
+        }
         Err(error) => Err(error),
     }
 }
@@ -506,7 +509,8 @@ impl From<&PersistedProject> for Project {
                 .endpoints
                 .iter()
                 .map(|persisted_endpoint| persisted_endpoint.into()),
-        );
+        )
+        .into();
 
         let variable = persisted_project
             .variable
@@ -550,7 +554,8 @@ impl From<&PersistedEndpoint> for Endpoint {
                 .headers
                 .iter()
                 .map(|header| header.into()),
-        );
+        )
+        .into();
 
         Endpoint {
             name: persisted_endpoint.name.clone().into(),

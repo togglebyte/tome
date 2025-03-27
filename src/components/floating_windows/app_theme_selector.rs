@@ -7,8 +7,7 @@ use std::{
 
 use anathema::{
     component::{Component, ComponentId},
-    prelude::TuiBackend,
-    runtime::RuntimeBuilder,
+    runtime::Builder,
     state::{List, State, Value},
 };
 
@@ -45,7 +44,7 @@ impl AppThemeSelectorState {
             current_first_index: 0.into(),
             current_last_index: 4.into(),
             visible_items: 5.into(),
-            window_list: List::empty(),
+            window_list: List::empty().into(),
             selected_app_theme: "".to_string().into(),
             app_theme: app_theme.into(),
         }
@@ -62,9 +61,9 @@ pub struct AppThemeSelector {
 impl AppThemeSelector {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
     ) -> anyhow::Result<()> {
-        let id = builder.register_component(
+        let id = builder.component(
             "app_theme_selector",
             template("floating_windows/templates/app_theme_selector"),
             AppThemeSelector::new(ids.clone()),
@@ -194,8 +193,8 @@ impl Component for AppThemeSelector {
         &mut self,
         event: anathema::component::KeyEvent,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match event.code {
             anathema::component::KeyCode::Char(char) => match char {
@@ -209,7 +208,7 @@ impl Component for AppThemeSelector {
 
             anathema::component::KeyCode::Esc => {
                 // NOTE: This sends cursor to satisfy publish() but is not used
-                context.publish("app_theme_selector__cancel", |state| &state.cursor)
+                context.publish("app_theme_selector__cancel")
             }
 
             anathema::component::KeyCode::Enter => {
@@ -222,14 +221,16 @@ impl Component for AppThemeSelector {
                             .selected_app_theme
                             .set(app_theme_persisted.name.clone());
 
-                        context.publish("app_theme_selector__selection", |state| {
-                            &state.selected_app_theme
-                        });
+                        // context.publish("app_theme_selector__selection", |state| {
+                        //     &state.selected_app_theme
+                        // });
 
                         let app_theme = get_app_theme_by_name(&state.selected_app_theme.to_ref());
                         state.app_theme.set(app_theme);
                     }
-                    None => context.publish("app_theme_selector__cancel", |state| &state.cursor),
+                    None => {
+                        context.publish("app_theme_selector__cancel")
+                    }
                 }
             }
 
@@ -240,8 +241,8 @@ impl Component for AppThemeSelector {
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         self.update_app_theme(state);
 
@@ -273,8 +274,8 @@ impl Component for AppThemeSelector {
         &mut self,
         _: Self::Message,
         _: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         // println!("Received message in project window: {message}");
 

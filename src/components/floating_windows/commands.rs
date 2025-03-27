@@ -6,10 +6,8 @@ use std::{
 
 use anathema::{
     component::{self, Component, ComponentId},
-    prelude::TuiBackend,
-    runtime::RuntimeBuilder,
-    state::{State, Value},
-    widgets::Elements,
+    runtime::Builder,
+    state::{AnyState, State, Value},
 };
 
 use crate::{
@@ -34,9 +32,9 @@ pub struct Commands;
 impl Commands {
     pub fn register(
         ids: &Rc<RefCell<HashMap<String, ComponentId<String>>>>,
-        builder: &mut RuntimeBuilder<TuiBackend, ()>,
+        builder: &mut Builder<()>,
     ) -> anyhow::Result<()> {
-        let app_id = builder.register_component(
+        let app_id = builder.component(
             "commands_window",
             template("floating_windows/templates/commands"),
             Commands {},
@@ -84,8 +82,8 @@ impl Component for Commands {
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        _: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        _: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         self.update_app_theme(state);
     }
@@ -94,17 +92,17 @@ impl Component for Commands {
         &mut self,
         key: anathema::component::KeyEvent,
         state: &mut Self::State,
-        _: anathema::widgets::Elements<'_, '_>,
-        mut context: anathema::prelude::Context<'_, Self::State>,
+        _: anathema::component::Children,
+        mut context: anathema::prelude::Context<'_, '_, Self::State>,
     ) {
         match key.code {
             anathema::component::KeyCode::Char(char) => {
                 state.command.set(char);
-                context.publish("commands__selection", |state| &state.command);
+                context.publish("commands__selection");
             }
 
             anathema::component::KeyCode::Esc => {
-                context.publish("commands__cancel", |state| &state.command);
+                context.publish("commands__cancel");
             }
 
             _ => {}
@@ -114,23 +112,23 @@ impl Component for Commands {
 
 impl DashboardMessageHandler for Commands {
     fn handle_message(
-        value: component::CommonVal<'_>,
+        value: &dyn AnyState,
         ident: impl Into<String>,
         state: &mut DashboardState,
-        mut context: anathema::prelude::Context<'_, DashboardState>,
-        _: Elements<'_, '_>,
+        mut context: anathema::prelude::Context<'_, '_, DashboardState>,
+        _: anathema::component::Children,
         component_ids: Ref<'_, HashMap<String, ComponentId<String>>>,
     ) {
         let event: String = ident.into();
 
         match event.as_str() {
             #[allow(clippy::single_match)]
-            "commands__selection" => match value.to_string().as_str() {
+            "commands__selection" => match value.as_str().unwrap() {
                 "a" => {
                     state
                         .floating_window
                         .set(FloatingWindow::AddProjectVariable);
-                    context.set_focus("id", "add_project_variable");
+                    context.components.by_name("add_project_variable").focus();
 
                     let Ok(message) =
                         serde_json::to_string(&AddProjectVariableMessages::InitialFocus)
@@ -150,7 +148,7 @@ impl DashboardMessageHandler for Commands {
                     state
                         .floating_window
                         .set(FloatingWindow::ViewProjectVariables);
-                    context.set_focus("id", "project_variables");
+                    context.components.by_name("project_variables").focus();
 
                     let variables: Vec<PersistedVariable> = state
                         .project
@@ -181,19 +179,19 @@ impl DashboardMessageHandler for Commands {
 
                 "g" => {
                     state.floating_window.set(FloatingWindow::CodeGen);
-                    context.set_focus("id", "codegen_window");
+                    context.components.by_name("codegen_window").focus();
                 }
 
                 "i" => {
                     state
                         .floating_window
                         .set(FloatingWindow::PostmanFileSelector);
-                    context.set_focus("id", "postman_file_selector");
+                    context.components.by_name("postman_file_selector").focus();
                 }
 
                 "e" => {
                     state.floating_window.set(FloatingWindow::CodeGen);
-                    context.set_focus("id", "codegen_window");
+                    context.components.by_name("codegen_window").focus();
 
                     let project: PersistedProject = (&*state.project.to_ref()).into();
 
@@ -225,7 +223,7 @@ impl DashboardMessageHandler for Commands {
 
             "commands__cancel" => {
                 state.floating_window.set(FloatingWindow::None);
-                context.set_focus("id", "app");
+                context.components.by_name("app").focus();
             }
 
             _ => {}

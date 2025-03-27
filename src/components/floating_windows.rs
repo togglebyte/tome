@@ -1,4 +1,4 @@
-use anathema::state::{CommonVal, State};
+use anathema::state::State;
 
 pub mod add_project_variable;
 pub mod app_theme_selector;
@@ -34,25 +34,29 @@ pub enum FloatingWindow {
 }
 
 impl State for FloatingWindow {
-    fn to_common(&self) -> Option<CommonVal<'_>> {
+    fn type_info(&self) -> anathema::state::Type {
+        anathema::state::Type::String
+    }
+
+    fn as_str(&self) -> Option<&str> {
         match self {
-            FloatingWindow::None => Some(CommonVal::Str("None")),
-            FloatingWindow::Method => Some(CommonVal::Str("Method")),
-            FloatingWindow::AddHeader => Some(CommonVal::Str("AddHeader")),
-            FloatingWindow::Error => Some(CommonVal::Str("Error")),
-            FloatingWindow::EditHeaderSelector => Some(CommonVal::Str("EditHeaderSelector")),
-            FloatingWindow::Project => Some(CommonVal::Str("Project")),
-            FloatingWindow::ConfirmAction => Some(CommonVal::Str("ConfirmAction")),
-            FloatingWindow::Message => Some(CommonVal::Str("Message")),
-            FloatingWindow::ChangeEndpointName => Some(CommonVal::Str("ChangeEndpointName")),
-            FloatingWindow::ChangeProjectName => Some(CommonVal::Str("ChangeProjectName")),
-            FloatingWindow::EndpointsSelector => Some(CommonVal::Str("EndpointsSelector")),
-            FloatingWindow::Commands => Some(CommonVal::Str("Commands")),
-            FloatingWindow::CodeGen => Some(CommonVal::Str("CodeGen")),
-            FloatingWindow::PostmanFileSelector => Some(CommonVal::Str("PostmanFileSelector")),
-            FloatingWindow::BodyModeSelector => Some(CommonVal::Str("BodyModeSelector")),
-            FloatingWindow::AddProjectVariable => Some(CommonVal::Str("AddProjectVariable")),
-            FloatingWindow::ViewProjectVariables => Some(CommonVal::Str("ViewProjectVariables")),
+            Self::None => Some("None"),
+            Self::Method => Some("Method"),
+            Self::AddHeader => Some("AddHeader"),
+            Self::Error => Some("Error"),
+            Self::EditHeaderSelector => Some("EditHeaderSelector"),
+            Self::Project => Some("Project"),
+            Self::ConfirmAction => Some("ConfirmAction"),
+            Self::Message => Some("Message"),
+            Self::ChangeEndpointName => Some("ChangeEndpointName"),
+            Self::ChangeProjectName => Some("ChangeProjectName"),
+            Self::EndpointsSelector => Some("EndpointsSelector"),
+            Self::Commands => Some("Commands"),
+            Self::CodeGen => Some("CodeGen"),
+            Self::PostmanFileSelector => Some("PostmanFileSelector"),
+            Self::BodyModeSelector => Some("BodyModeSelector"),
+            Self::AddProjectVariable => Some("AddProjectVariable"),
+            Self::ViewProjectVariables => Some("ViewProjectVariables"),
         }
     }
 }
