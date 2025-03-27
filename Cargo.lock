@@ -11,6 +11,7 @@ checksum = "512761e0bb2578dd7380c6baaa0f4ce03e84f95e960231d1dec8bf4d7d6e2627"
 [[package]]
 name = "anathema"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 dependencies = [
  "anathema-backend",
  "anathema-debug",
@@ -29,6 +30,7 @@ dependencies = [
 [[package]]
 name = "anathema-backend"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 dependencies = [
  "anathema-geometry",
  "anathema-state",
@@ -45,10 +47,12 @@ dependencies = [
 [[package]]
 name = "anathema-debug"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 
 [[package]]
 name = "anathema-default-widgets"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 dependencies = [
  "anathema-backend",
  "anathema-geometry",
@@ -64,10 +68,12 @@ dependencies = [
 [[package]]
 name = "anathema-geometry"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 
 [[package]]
 name = "anathema-runtime"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 dependencies = [
  "anathema-backend",
  "anathema-debug",
@@ -86,6 +92,7 @@ dependencies = [
 [[package]]
 name = "anathema-state"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 dependencies = [
  "anathema-debug",
  "anathema-state-derive",
@@ -95,6 +102,7 @@ dependencies = [
 [[package]]
 name = "anathema-state-derive"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 dependencies = [
  "manyhow",
  "quote",
@@ -105,6 +113,7 @@ dependencies = [
 [[package]]
 name = "anathema-store"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 dependencies = [
  "anathema-debug",
 ]
@@ -112,6 +121,7 @@ dependencies = [
 [[package]]
 name = "anathema-strings"
 version = "0.1.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 dependencies = [
  "anathema-store",
 ]
@@ -119,6 +129,7 @@ dependencies = [
 [[package]]
 name = "anathema-templates"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 dependencies = [
  "anathema-debug",
  "anathema-state",
@@ -128,6 +139,7 @@ dependencies = [
 [[package]]
 name = "anathema-value-resolver"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 dependencies = [
  "anathema-state",
  "anathema-store",
@@ -138,6 +150,7 @@ dependencies = [
 [[package]]
 name = "anathema-widgets"
 version = "0.2.0"
+source = "git+https://github.com/museun/anathema.git?branch=tome#76be178bc88ee0dae74a3f3a759d22689035606f"
 dependencies = [
  "anathema-debug",
  "anathema-geometry",

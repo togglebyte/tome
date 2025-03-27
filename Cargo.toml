@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anathema = { git = "https://github.com/museun/anathema.git", branch = "cache_style" }
+anathema = { git = "https://github.com/museun/anathema.git", branch = "tome" }
 anyhow = "1.0.95"
 arboard = "3.4.1"
 clap = { version = "4.5.26", features = [ "derive", "env", "cargo" ] }
@@ -28,7 +28,3 @@ void = "1.0.2"
 default = [ "runtime_templates" ]
 runtime_templates = [  ]
 static_templates = [  ]
-
-
-[patch.'https://github.com/museun/anathema']
-anathema = { path = "f:/forks/anathema" }
