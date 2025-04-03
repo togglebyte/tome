@@ -47,7 +47,7 @@ zstack [background: state.app_theme.background]
           if state.main_display == "response_body"
             expand
               zstack
-                @response_renderer [id: "response_renderer"]
+                @response_renderer [id: "response_renderer", top_label: state.response_body_window_label]
 
           if state.main_display == "request_headers_editor"
             expand

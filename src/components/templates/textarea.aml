@@ -1,5 +1,5 @@
 overflow [id: "container"]
   zstack
-    text [id: "contents", foreground: text_color] input
-    text cursor_prefix
-      span [foreground: fg_color, background: bg_color] cursor_char
+    text [id: "contents", foreground: state.text_color] state.input
+    text state.cursor_prefix
+      span [foreground: state.fg_color, background: state.bg_color] state.cursor_char
